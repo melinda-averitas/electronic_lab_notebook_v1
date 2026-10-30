@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Averitas ELN | R&amp;D Folders</title>
+  <style>
+    :root{--bg:#f6f8f7;--card:#fff;--text:#1f2933;--muted:#667085;--border:#d7ded9;--accent:#0f766e;--accent-dark:#115e59}
+    *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:22px 16px;background:linear-gradient(135deg,#0f766e,#164e63);color:#fff}header h1{margin:0 0 6px;font-size:1.45rem}header p{margin:0;opacity:.9}
+    main{max-width:760px;margin:auto;padding:16px 16px calc(100px + env(safe-area-inset-bottom,0px))}
+    .top-nav{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 16px}.top-nav a{color:var(--accent);font-weight:700;text-decoration:none;min-height:44px;display:flex;align-items:center}
+    section,.folder-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+    h2{font-size:1.05rem;margin:0 0 12px}label{display:block;font-size:.9rem;font-weight:650;margin:10px 0 6px}
+    input{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font-size:1rem}
+    button,.action{border:0;border-radius:10px;padding:12px 14px;font-size:.96rem;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px}
+    button.secondary,.action.secondary{background:#e8f3f1;color:var(--accent-dark);border:1px solid var(--border)}
+    .form-row{display:flex;gap:10px;align-items:end}.form-row>div{flex:1}.form-row button{white-space:nowrap}
+    .status,.empty{background:#eef7f5;border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--muted);margin:12px 0}
+    .folder-card{display:flex;gap:12px;align-items:center;justify-content:space-between}.folder-name{font-weight:750;overflow-wrap:anywhere}.folder-meta{font-size:.82rem;color:var(--muted);margin-top:4px}.folder-actions{display:flex;gap:8px;flex-shrink:0}.folder-actions .action,.folder-actions button{padding:9px 11px;min-height:40px;font-size:.88rem}
+    @media(max-width:520px){.form-row{display:block}.form-row button{width:100%;margin-top:10px}.folder-card{align-items:flex-start;flex-direction:column}.folder-actions{width:100%}.folder-actions>*{flex:1}}
+  </style>
+</head>
+<body>
+<header><h1>R&amp;D Folders</h1><p>Keep separate experimental programs organized in one notebook.</p></header>
+<main>
+  <nav class="top-nav" aria-label="Notebook navigation"><a href="index.html">Home</a><a href="new_field_data.html">Field Data</a><a href="my-field-data.html">My Field Data</a><a href="login.html">Sign in</a></nav>
+  <section>
+    <h2>Create a folder</h2>
+    <form id="folderForm">
+      <div class="form-row"><div><label for="folderName">Program or project name</label><input id="folderName" maxlength="120" placeholder="e.g., Tea MP/NP Study" required /></div><button id="createFolderButton" type="submit">Create folder</button></div>
+    </form>
+    <div id="folderStatus" class="status" role="status" aria-live="polite">Loading your folders…</div>
+  </section>
+  <section>
+    <h2>Your folders</h2>
+    <div id="folderList"><div class="empty">Loading…</div></div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL="https://wpavjglhayzqyxnhceip.supabase.co";
+const SUPABASE_KEY="sb_publishable_so12Fczumz73kItENFdnrA_XSaNN1d3";
+const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let currentUser=null;
+const statusBox=document.getElementById("folderStatus");
+function esc(value){return String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+async function requireLogin(){
+  const {data,error}=await supabaseClient.auth.getUser();
+  if(error||!data.user){statusBox.textContent="Sign in to create and manage your folders.";return false}
+  currentUser=data.user;return true;
+}
+async function loadFolders(){
+  if(!await requireLogin())return;
+  const {data,error}=await supabaseClient.from("folders").select("id,name,created_at").eq("user_id",currentUser.id).order("name");
+  if(error){statusBox.textContent="Could not load folders: "+error.message;return}
+  const box=document.getElementById("folderList");
+  if(!data?.length){box.innerHTML='<div class="empty">No folders yet. Create one above to organize your experiments.</div>';statusBox.textContent="No folders created yet.";return}
+  box.replaceChildren();
+  for(const folder of data){
+    const card=document.createElement("article");card.className="folder-card";
+    const info=document.createElement("div");
+    const name=document.createElement("div");name.className="folder-name";name.textContent=folder.name;
+    const meta=document.createElement("div");meta.className="folder-meta";meta.textContent="Created "+new Date(folder.created_at).toLocaleDateString();
+    info.append(name,meta);
+    const actions=document.createElement("div");actions.className="folder-actions";
+    const open=document.createElement("a");open.className="action";open.href="my-field-data.html?folder="+encodeURIComponent(folder.id);open.textContent="Open entries";
+    const rename=document.createElement("button");rename.type="button";rename.className="secondary";rename.textContent="Rename";rename.addEventListener("click",()=>renameFolder(folder));
+    actions.append(open,rename);card.append(info,actions);box.appendChild(card);
+  }
+  statusBox.textContent=data.length+" folder"+(data.length===1?"":"s");
+}
+async function createFolder(event){
+  event.preventDefault();
+  if(!await requireLogin())return;
+  const input=document.getElementById("folderName"),name=input.value.trim();
+  if(!name){statusBox.textContent="Enter a folder name.";return}
+  const button=document.getElementById("createFolderButton");button.disabled=true;
+  const {error}=await supabaseClient.from("folders").insert({user_id:currentUser.id,name});
+  button.disabled=false;
+  if(error){statusBox.textContent=error.message.includes("folders_owner_name_unique")?"You already have a folder with that name.":"Could not create folder: "+error.message;return}
+  input.value="";statusBox.textContent="Folder created.";await loadFolders();
+}
+async function renameFolder(folder){
+  const name=prompt("Rename folder",folder.name)?.trim();
+  if(!name||name===folder.name)return;
+  const {error}=await supabaseClient.from("folders").update({name}).eq("id",folder.id).eq("user_id",currentUser.id);
+  if(error){statusBox.textContent="Could not rename folder: "+error.message;return}
+  statusBox.textContent="Folder renamed.";await loadFolders();
+}
+document.getElementById("folderForm").addEventListener("submit",createFolder);
+loadFolders().catch(error=>{statusBox.textContent="Could not load folders: "+error.message});
+</script>
+</body>
+</html>
