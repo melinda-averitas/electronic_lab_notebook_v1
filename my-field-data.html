@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EcoExposure™ | My Field Data</title>
+<title>Averitas ELN | My Field Data</title>
 <style>
 :root{--bg:#f6f8f7;--card:#fff;--text:#1f2933;--muted:#6b7280;--border:#d7ded9;--accent:#0f766e}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -11,8 +11,10 @@ header{padding:22px 16px;background:linear-gradient(135deg,#0f766e,#164e63);colo
 main{max-width:900px;margin:auto;padding:16px}.top-nav{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}.top-nav a{color:var(--accent);font-weight:700;text-decoration:none}
 .status,.empty{background:#eef7f5;border:1px solid var(--border);border-radius:12px;padding:14px;color:var(--muted);margin-bottom:16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.photo{min-height:180px;background:#eef2f1;display:flex;align-items:center;justify-content:center}.photo img{width:100%;max-height:320px;object-fit:cover}.no-photo{color:var(--muted);padding:28px}
+.photo{min-height:130px;background:#eef2f1;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;padding:6px}.photo img{width:100%;height:220px;object-fit:contain;background:#fff;border-radius:8px}.no-photo{color:var(--muted);padding:28px}
 .content{padding:14px}.meta{font-size:.84rem;color:var(--muted);line-height:1.5;margin-bottom:10px}.notes{white-space:pre-wrap;line-height:1.5}
+.filters{display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin:0 0 16px}.filters label{display:block;font-size:.84rem;font-weight:700;margin-bottom:5px}.filters select,.filters input,.filters button{width:100%;min-height:44px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:1rem}.filters button{background:var(--accent);color:#fff;font-weight:700;border:0;align-self:end}.filters button.secondary{background:#e8f3f1;color:#115e59;border:1px solid var(--border)}.entry-title{font-weight:750;font-size:1.1rem;margin:0 0 8px;color:var(--accent)}
+@media(max-width:560px){.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}}
     main{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))}
     .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-around;min-height:80px;padding:10px 4px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.97);border-top:1px solid #d7ded9;box-shadow:0 -4px 16px rgba(0,22,41,.04);backdrop-filter:blur(12px)}
     .bottom-nav a{display:flex;flex:1;min-width:0;min-height:48px;max-width:120px;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:4px 2px;border-radius:24px;color:#6b7280;text-decoration:none;font-size:10px;font-weight:700}
@@ -25,7 +27,14 @@ main{max-width:900px;margin:auto;padding:16px}.top-nav{display:flex;gap:12px;fle
 <body>
 <header><h1>My Field Data</h1><p>Your saved field photos, locations, and notes.</p></header>
 <main>
-
+<div class="top-nav"><a href="folders.html">Manage Folders →</a><a href="new_field_data.html">Add Field Data →</a></div>
+<section class="filters" aria-label="Filter and export entries">
+  <div><label for="folderFilter">Folder</label><select id="folderFilter"><option value="">All folders</option></select></div>
+  <div><label for="dateFilter">Day</label><input id="dateFilter" type="date"></div>
+  <button id="journalButton" class="secondary" type="button" onclick="openObservationJournal()">Print / Save Journal PDF</button>
+  <button id="downloadZipButton" type="button" onclick="downloadPhotoZip()">Download photo ZIP</button>
+</section>
+<div id="zipStatus" class="status" role="status" aria-live="polite" hidden></div>
 <div id="status" class="status">Loading your Field Data...</div>
 <div id="entries" class="grid"></div>
 </main>
@@ -39,21 +48,25 @@ main{max-width:900px;margin:auto;padding:16px}.top-nav{display:flex;gap:12px;fle
     <a href="learn.html"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v16M12 5C9 2 4 2 2 3v16c3-1 7-1 10 2 3-3 7-3 10-2V3c-2-1-7-1-10 2zM5 7h4M5 11h4M15 7h4M15 11h4"/></svg><span>Learn</span></a>
   </nav>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="field-instruments.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-const SUPABASE_URL="https://qximbeodwjhxuzcqenvs.supabase.co";
-const SUPABASE_KEY="sb_publishable_y5c-8UikxGZZJzyea0lG6g_TibWgKPW";
+const SUPABASE_URL="https://wpavjglhayzqyxnhceip.supabase.co";
+const SUPABASE_KEY="sb_publishable_so12Fczumz73kItENFdnrA_XSaNN1d3";
 const OTHER_DATA_BUCKET="field-data";
 const OTHER_DATA_TABLE="field_data";
+const FOLDERS_TABLE="folders";
 const supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let currentUser=null;
+let allEntries=[];
+let folderNames=new Map();
 
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 function fmt(v){if(!v)return"";const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString()}
+function photoPaths(row){return Array.isArray(row.photo_paths)&&row.photo_paths.length?row.photo_paths.filter(Boolean):(row.file_path?[row.file_path]:[])}
 
 async function requireLogin(){
   const {data,error}=await supabaseClient.auth.getUser();
-  if(error||!data.user){window.location.replace("login.html");return false}
+  if(error||!data.user){window.location.replace("login.html?next=my-field-data.html");return false}
   currentUser=data.user;return true
 }
 
@@ -67,22 +80,90 @@ async function signedUrl(path){
 async function load(){
   const status=document.getElementById("status"),box=document.getElementById("entries");
   if(!await requireLogin())return;
-  const {data,error}=await supabaseClient.from(OTHER_DATA_TABLE)
-    .select("id,user_id,file_path,notes,latitude,longitude,created_at,observed_at,instrument_reading")
-    .eq("user_id",currentUser.id).order("created_at",{ascending:false});
+  const {data:folders,error:folderError}=await supabaseClient.from(FOLDERS_TABLE).select("id,name").eq("user_id",currentUser.id);
+  if(folderError){status.textContent="Could not load folders: "+folderError.message;return}
+  folderNames=new Map((folders||[]).map(folder=>[folder.id,folder.name]));
+  const folderSelect=document.getElementById("folderFilter");
+  for(const folder of folders||[]){const option=document.createElement("option");option.value=folder.id;option.textContent=folder.name;folderSelect.appendChild(option)}
+  const requestedFolder=new URLSearchParams(window.location.search).get("folder");
+  if(requestedFolder&&folderNames.has(requestedFolder))folderSelect.value=requestedFolder;
+  const {data,error}=await supabaseClient.from(OTHER_DATA_TABLE).select("id,user_id,title,folder_id,file_path,photo_paths,notes,latitude,longitude,observed_at,created_at").eq("user_id",currentUser.id).order("created_at",{ascending:false});
   if(error){status.textContent="Could not load Field Data: "+error.message;return}
-  if(!data||!data.length){status.style.display="none";box.innerHTML='<div class="empty">No Field Data saved yet.</div>';return}
-  status.textContent=data.length+" saved entr"+(data.length===1?"y":"ies");
-  for(const row of data){
-    const url=await signedUrl(row.file_path);
+  allEntries=data||[];
+  document.getElementById("folderFilter").addEventListener("change",renderEntries);
+  document.getElementById("dateFilter").addEventListener("change",renderEntries);
+  renderEntries();
+}
+function entryDate(row){const d=new Date(row.observed_at||row.created_at);return Number.isNaN(d.getTime())?"":`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+function filteredEntries(){const folder=document.getElementById("folderFilter").value,day=document.getElementById("dateFilter").value;return allEntries.filter(row=>(!folder||row.folder_id===folder)&&(!day||entryDate(row)===day))}
+async function renderEntries(){
+  const status=document.getElementById("status"),box=document.getElementById("entries"),rows=filteredEntries();
+  box.replaceChildren();
+  const folder=document.getElementById("folderFilter").value,folderName=folderNames.get(folder);
+  if(!rows.length){status.textContent=allEntries.length?"No entries match these filters.":"No Field Data saved yet.";box.innerHTML='<div class="empty">Use Field Data to capture a note or photo.</div>';return}
+  status.textContent=(folderName?folderName+" · ":"")+rows.length+" saved entr"+(rows.length===1?"y":"ies");
+  for(const row of rows){
+    const urls=await Promise.all(photoPaths(row).map(signedUrl));
+    const photoHtml=urls.map((url,index)=>url?`<img src="${esc(url)}" alt="Field Data photo ${index+1}">`:"").join("");
     const gps=(row.latitude!=null&&row.longitude!=null)?Number(row.latitude).toFixed(5)+", "+Number(row.longitude).toFixed(5):"";
     const card=document.createElement("article");card.className="card";
-    card.innerHTML=`<div class="photo">${url?`<img src="${esc(url)}" alt="Field Data photo">`:'<div class="no-photo">No photo</div>'}</div>
-      <div class="content"><div class="meta">${row.created_at?`<div><strong>Saved:</strong> ${esc(fmt(row.created_at))}</div>`:""}${gps?`<div><strong>GPS:</strong> ${esc(gps)}</div>`:""}</div>
+    card.innerHTML=`<div class="photo">${photoHtml||'<div class="no-photo">No photos</div>'}</div>
+      <div class="content"><h2 class="entry-title">${esc(row.title||"Field observation")}</h2><div class="meta">${row.observed_at||row.created_at?`<div><strong>Observed:</strong> ${esc(fmt(row.observed_at||row.created_at))}</div>`:""}${gps?`<div><strong>GPS:</strong> ${esc(gps)}</div>`:""}${row.folder_id?`<div><strong>Folder:</strong> ${esc(folderNames.get(row.folder_id)||"Folder")}</div>`:"<div><strong>Folder:</strong> Unfiled</div>"}</div>
       <div class="notes">${row.notes?esc(row.notes):'<span style="color:#6b7280">No notes</span>'}</div></div>`;
-    if(row.instrument_reading) card.appendChild(window.FieldInstruments.savedElement(row.instrument_reading));
     box.appendChild(card);
   }
+}
+async function downloadPhotoZip(){
+  const status=document.getElementById("zipStatus"),button=document.getElementById("downloadZipButton"),rows=filteredEntries().filter(row=>photoPaths(row).length);
+  status.hidden=false;
+  if(!rows.length){status.textContent="No photos in the selected folder/day.";return}
+  if(!window.JSZip){status.textContent="ZIP tool did not load. Refresh the page and try again.";return}
+  const totalPhotos=rows.reduce((sum,row)=>sum+photoPaths(row).length,0);
+  button.disabled=true;status.textContent=`Preparing ${totalPhotos} photo${totalPhotos===1?"":"s"}…`;
+  try{
+    const zip=new JSZip();let added=0;
+    for(const row of rows){
+      for(const path of photoPaths(row)){
+        const {data,error}=await supabaseClient.storage.from(OTHER_DATA_BUCKET).download(path);
+        if(error)throw new Error(`Could not download a photo: ${error.message}`);
+        const parts=path.split("/");
+        const fileName=parts.at(-1)||`photo-${row.id}-${added+1}.webp`;
+        const archiveFolder=parts.length>=4?`${parts[1]}/${parts[2]}`:`${(folderNames.get(row.folder_id)||"Unfiled").replace(/[^a-zA-Z0-9_-]+/g,"-")}/${entryDate(row)||"undated"}`;
+        zip.file(`${archiveFolder}/${fileName}`,data);added++;
+        status.textContent=`Adding photo ${added} of ${totalPhotos}…`;
+      }
+    }
+    const blob=await zip.generateAsync({type:"blob"});
+    const folder=(document.getElementById("folderFilter").selectedOptions[0]?.textContent||"all-folders").replace(/[^a-zA-Z0-9_-]+/g,"-");
+    const day=document.getElementById("dateFilter").value||"all-days";
+    const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`Averitas_ELN_Photos_${folder}_${day}.zip`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    status.textContent=`ZIP ready: ${added} photo${added===1?"":"s"}, grouped by folder and day.`;
+  }catch(error){status.textContent="ZIP could not be created: "+error.message}
+  finally{button.disabled=false}
+}
+async function openObservationJournal(){
+  const status=document.getElementById("zipStatus"),button=document.getElementById("journalButton"),rows=filteredEntries();
+  status.hidden=false;
+  if(!rows.length){status.textContent="No observations in the selected folder/day.";return}
+  const printWindow=window.open("","_blank");
+  if(!printWindow){status.textContent="Allow pop-ups for this site, then try Print / Save Journal PDF again.";return}
+  button.disabled=true;status.textContent=`Preparing ${rows.length} observation${rows.length===1?"":"s"}…`;
+  try{
+    const folder=document.getElementById("folderFilter").selectedOptions[0]?.textContent||"All folders";
+    const day=document.getElementById("dateFilter").value||"All days";
+    const cards=[];
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i],urls=await Promise.all(photoPaths(row).map(signedUrl)),gps=row.latitude!=null&&row.longitude!=null?`${Number(row.latitude).toFixed(6)}, ${Number(row.longitude).toFixed(6)}`:"Not captured";
+      const images=urls.map((url,index)=>url?`<figure><img src="${esc(url)}" alt="Observation photo ${index+1}"><figcaption>Photo ${index+1}</figcaption></figure>`:"").join("");
+      cards.push(`<article><h2>${esc(row.title||"Field observation")}</h2><p class="meta"><b>Observed:</b> ${esc(fmt(row.observed_at||row.created_at))}<br><b>Folder:</b> ${esc(folderNames.get(row.folder_id)||"Unfiled")}<br><b>GPS:</b> ${esc(gps)}</p>${images||"<p class=\"meta\">No photos saved</p>"}<h3>Field notes</h3><p class="notes">${esc(row.notes||"No notes added.")}</p></article>`);
+      status.textContent=`Adding observation ${i+1} of ${rows.length}…`;
+    }
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Averitas ELN Observation Journal</title><style>body{font:16px Arial,sans-serif;color:#1f2933;max-width:850px;margin:24px auto;padding:0 18px}header{border-bottom:3px solid #0f766e;padding-bottom:12px;margin-bottom:22px}h1{color:#0f766e}article{border:1px solid #d7ded9;border-radius:12px;padding:18px;margin:0 0 20px;break-inside:avoid}article h2{color:#115e59;margin:0 0 10px}.meta{color:#52616b;font-size:13px;line-height:1.6}.notes{white-space:pre-wrap;line-height:1.5}figure{margin:12px 0}figcaption{font-size:12px;color:#52616b;text-align:center}img{display:block;max-width:100%;max-height:600px;object-fit:contain;margin:16px auto}button{background:#0f766e;color:#fff;border:0;border-radius:8px;padding:12px 16px;font-size:16px}@media print{body{margin:0 auto}button{display:none}article{break-inside:avoid}}</style></head><body><button onclick="window.print()">Print / Save as PDF</button><header><h1>Averitas ELN — Observation Journal</h1><p>${esc(folder)} · ${esc(day)} · ${rows.length} entr${rows.length===1?"y":"ies"}</p></header>${cards.join("")}<footer>Field observations only — not laboratory analytical results.</footer></body></html>`);
+    printWindow.document.close();
+    status.textContent="Journal opened. Use Print / Save as PDF in the new tab to keep one combined document.";
+  }catch(error){printWindow.close();status.textContent="Could not prepare the journal: "+error.message}
+  finally{button.disabled=false}
 }
 load();
 </script>

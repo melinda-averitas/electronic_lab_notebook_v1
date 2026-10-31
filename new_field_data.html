@@ -223,6 +223,7 @@
     .bottom-nav a[aria-current="page"]{background:#c7eeea;color:#00504b}
     .bottom-nav a:focus-visible{outline:3px solid #0f766e;outline-offset:1px}
     .bottom-nav .material-symbols-outlined{font-size:24px;line-height:1}
+    .photo-slots{display:grid;gap:12px}.photo-slot{border:1px solid var(--border);border-radius:12px;padding:12px;background:#fbfdfc}.photo-slot h3{font-size:1rem;margin:0 0 8px}.photo-slot .preview{max-height:240px;margin-top:10px}.photo-slot .slot-status{font-size:.88rem;color:var(--muted);margin-top:8px}.photo-slot .remove-photo{width:auto;background:#eef2f1;color:var(--text);padding:8px 12px}
     [hidden]{display:none!important}p,li{line-height:1.5}summary{cursor:pointer;font-weight:700}li{margin-bottom:8px}button:disabled{opacity:.55;cursor:wait}
   </style>
 </head>
@@ -251,25 +252,14 @@
     </section>
 
     <section>
-      <h2>Photo</h2>
-
-      <div class="image-slot">
-        <div class="button-row">
-          <button type="button" onclick="openPhotoCamera()">📷 Take Photo</button>
-
-          <label class="file-button">
-            📎 Choose Photo / File
-            <input
-              id="fileInput"
-              type="file"
-              accept="image/*"
-              onchange="handleFileSelect(event)"
-            />
-          </label>
-        </div>
-
-        <div id="photoCaptured" class="captured-label">✓ Photo added</div>
-        <img id="photoPreview" class="preview" alt="Field data preview" />
+      <h2>Photos</h2>
+      <p>Add up to five photos to this observation. Every slot is optional; leave any unused slot empty.</p>
+      <div class="photo-slots">
+        <div class="photo-slot"><h3>Photo 1 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(0)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput0" type="file" accept="image/*" onchange="handleFileSelect(event,0)"></label></div><div id="photoStatus0" class="slot-status">No photo selected.</div><img id="photoPreview0" class="preview" alt="Photo 1 preview" hidden><button id="removePhoto0" class="remove-photo" type="button" onclick="clearPhoto(0)" hidden>Remove photo</button></div>
+        <div class="photo-slot"><h3>Photo 2 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(1)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput1" type="file" accept="image/*" onchange="handleFileSelect(event,1)"></label></div><div id="photoStatus1" class="slot-status">No photo selected.</div><img id="photoPreview1" class="preview" alt="Photo 2 preview" hidden><button id="removePhoto1" class="remove-photo" type="button" onclick="clearPhoto(1)" hidden>Remove photo</button></div>
+        <div class="photo-slot"><h3>Photo 3 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(2)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput2" type="file" accept="image/*" onchange="handleFileSelect(event,2)"></label></div><div id="photoStatus2" class="slot-status">No photo selected.</div><img id="photoPreview2" class="preview" alt="Photo 3 preview" hidden><button id="removePhoto2" class="remove-photo" type="button" onclick="clearPhoto(2)" hidden>Remove photo</button></div>
+        <div class="photo-slot"><h3>Photo 4 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(3)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput3" type="file" accept="image/*" onchange="handleFileSelect(event,3)"></label></div><div id="photoStatus3" class="slot-status">No photo selected.</div><img id="photoPreview3" class="preview" alt="Photo 4 preview" hidden><button id="removePhoto3" class="remove-photo" type="button" onclick="clearPhoto(3)" hidden>Remove photo</button></div>
+        <div class="photo-slot"><h3>Photo 5 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(4)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput4" type="file" accept="image/*" onchange="handleFileSelect(event,4)"></label></div><div id="photoStatus4" class="slot-status">No photo selected.</div><img id="photoPreview4" class="preview" alt="Photo 5 preview" hidden><button id="removePhoto4" class="remove-photo" type="button" onclick="clearPhoto(4)" hidden>Remove photo</button></div>
       </div>
     </section>
 
@@ -278,6 +268,13 @@
 
       <button type="button" onclick="captureGPS()">📍 Add GPS</button>
       <div id="gpsStatus" class="info-box">No GPS location captured yet.</div>
+    </section>
+
+    <section>
+      <h2>Note Title</h2>
+      <label for="noteTitle">Title or name for this observation</label>
+      <input id="noteTitle" type="text" maxlength="160" placeholder="e.g., E. coli membrane prototype — Run 1" autocomplete="off" />
+      <div class="info-box">Give the entry a short title so you can find it later. A photo can be saved with or without notes.</div>
     </section>
 
     <section>
@@ -305,7 +302,7 @@
       <div class="info-box">Opens a draft in your email app. The PDF cannot be attached automatically by this button: download it first, then attach it before sending. Ecotera is copied only if you select the checkbox above.</div>
       <div id="emailStatus" class="status" role="status" aria-live="polite"></div>
       </details>
-      <details style="margin-top:16px"><summary>Save to your account</summary><p>Already signed in? Save this observation to My Data. Otherwise, <a href="login.html" target="_blank" rel="noopener">sign in or create an account in another tab</a>, then return here. Your draft stays in this tab.</p><button type="button" onclick="saveEntry()">Save to My Data</button></details><button class="secondary" type="button" onclick="if(confirm('Clear this observation? Download any reports you want to keep first.')) clearDraft()">Clear Current Draft</button>
+      <details style="margin-top:16px"><summary>Save to your account</summary><p>Already signed in? Save this observation to My Data. Otherwise, <a href="login.html?next=new_field_data.html" target="_blank" rel="noopener">sign in or create an account in another tab</a>, then return here. Your draft stays in this tab.</p><button type="button" onclick="saveEntry()">Save to My Data</button></details><button class="secondary" type="button" onclick="if(confirm('Clear this observation? Download any reports you want to keep first.')) clearDraft()">Clear Current Draft</button>
 
       <button id="pdfButton" type="button" onclick="generatePDF()">Generate PDF report</button>
       <button id="sharePDFButton" type="button" onclick="sharePreparedPDF()" hidden>Share PDF</button>
@@ -356,7 +353,8 @@
         field-data
 
       Table:
-        field_data
+        field_data (title, folder_id, photo_paths, file_path, notes, latitude,
+                    longitude, observed_at, created_at)
 
       Suggested columns:
         id uuid primary key default gen_random_uuid()
@@ -390,7 +388,8 @@
     let longitude = null;
     let photoStream = null;
     let cameraGeneration = 0;
-    let selectedPhotoBlob = null;
+    let selectedPhotos = Array(5).fill(null);
+    let cameraTargetSlot = 0;
     let observationTimestamp = null;
     let lastSavedObservation = null;
     let preparedPDF = null;
@@ -417,12 +416,13 @@
       document.getElementById('pdfStatus').textContent = '';
     }
     document.getElementById('notes').addEventListener('input', markObservation);
+    document.getElementById('noteTitle').addEventListener('input', markObservation);
     async function loadFolderOptions() {
       const select = document.getElementById("folderSelect");
       const status = document.getElementById("folderStatus");
       if (!supabaseClient) { status.textContent = "Account connection unavailable. You can still create a report."; return; }
       const { data: authData, error: authError } = await supabaseClient.auth.getUser();
-      if (authError || !authData.user) { status.textContent = "Sign in to choose a folder. You can still create a report or save an unfiled observation."; return; }
+      if (authError || !authData.user) { status.innerHTML = 'Sign in to choose a folder. <a href="login.html?next=new_field_data.html" target="_blank" rel="noopener">Sign in here</a>, then return and refresh folders.'; return; }
       currentUser = authData.user;
       const selected = select.value;
       const { data, error } = await supabaseClient.from(FOLDERS_TABLE).select("id,name").eq("user_id", currentUser.id).order("name");
@@ -438,9 +438,11 @@
     }
     function observationSnapshot() {
       const notes = document.getElementById('notes').value.trim();
-      if (selectedPhotoBlob || notes || latitude !== null) {
+      const title = document.getElementById('noteTitle').value.trim();
+      const photos = selectedPhotos.map((blob,slot)=>blob?{blob,slot}:null).filter(Boolean);
+      if (photos.length || notes || title || latitude !== null) {
         observationTimestamp ||= new Date().toISOString();
-        return {photo: selectedPhotoBlob, notes, latitude, longitude, timestamp: observationTimestamp, folderId: document.getElementById("folderSelect").value || null};
+        return {photos, title, notes, latitude, longitude, timestamp: observationTimestamp, folderId: document.getElementById("folderSelect").value || null, folderName: document.getElementById("folderSelect").selectedOptions[0]?.textContent || "Unfiled"};
       }
       return lastSavedObservation;
     }
@@ -465,11 +467,11 @@
       const gps = Number.isFinite(observation.latitude) && Number.isFinite(observation.longitude)
         ? observation.latitude.toFixed(6) + ', ' + observation.longitude.toFixed(6) : 'Not captured';
       const body = [
-        'Ecotera Asia — Field Observation',
+        'Averitas ELN — ' + (observation.title || 'Field Observation'),
         'Timestamp: ' + observation.timestamp,
         'GPS coordinates: ' + gps,
-        '', 'Field notes:', observation.notes || 'No notes added.', '',
-        observation.photo ? 'Photo: included in the PDF report. Attach the downloaded PDF before sending.' : 'Photo: no photo added.',
+        '', 'Title: ' + (observation.title || 'Field Observation'), '', 'Field notes:', observation.notes || 'No notes added.', '',
+        observation.photos.length ? `${observation.photos.length} photo${observation.photos.length===1?'':'s'} included in the PDF report. Attach the downloaded PDF before sending.` : 'Photos: none added.',
         '', 'Field observation only — not a laboratory analytical result.',
         '', 'hello@ecoteraasia.com | ecoteraasia.com'
       ].join('\n');
@@ -516,7 +518,8 @@
       );
     }
 
-    async function openPhotoCamera() {
+    async function openPhotoCamera(slotIndex) {
+      cameraTargetSlot = slotIndex;
       const dialog = document.getElementById("photoDialog");
       const video = document.getElementById("photoCameraPreview");
       const status = document.getElementById("photoCameraStatus");
@@ -592,14 +595,14 @@
       }
 
       markObservation();
-      selectedPhotoBlob = blob;
-      showPhotoPreview(blob);
+      selectedPhotos[cameraTargetSlot] = blob;
+      showPhotoPreview(blob,cameraTargetSlot);
 
       stopPhotoStream();
       document.getElementById("photoDialog").close();
     }
 
-    function handleFileSelect(event) {
+    function handleFileSelect(event,slotIndex) {
       const file = event.target.files?.[0];
 
       if (!file) return;
@@ -612,12 +615,12 @@
       }
 
       markObservation();
-      selectedPhotoBlob = file;
-      showPhotoPreview(file);
+      selectedPhotos[slotIndex] = file;
+      showPhotoPreview(file,slotIndex);
     }
 
-    function showPhotoPreview(blob) {
-      const preview = document.getElementById("photoPreview");
+    function showPhotoPreview(blob,slotIndex) {
+      const preview = document.getElementById(`photoPreview${slotIndex}`);
 
       if (preview.dataset.objectUrl) {
         URL.revokeObjectURL(preview.dataset.objectUrl);
@@ -627,9 +630,24 @@
 
       preview.src = objectUrl;
       preview.dataset.objectUrl = objectUrl;
+      preview.hidden = false;
       preview.style.display = "block";
+      document.getElementById(`photoStatus${slotIndex}`).textContent = "✓ Photo added.";
+      document.getElementById(`removePhoto${slotIndex}`).hidden = false;
+    }
 
-      document.getElementById("photoCaptured").style.display = "block";
+    function clearPhoto(slotIndex) {
+      selectedPhotos[slotIndex] = null;
+      const preview = document.getElementById(`photoPreview${slotIndex}`);
+      if (preview.dataset.objectUrl) URL.revokeObjectURL(preview.dataset.objectUrl);
+      delete preview.dataset.objectUrl;
+      preview.hidden = true;
+      preview.style.display = "none";
+      preview.removeAttribute("src");
+      document.getElementById(`fileInput${slotIndex}`).value = "";
+      document.getElementById(`photoStatus${slotIndex}`).textContent = "No photo selected.";
+      document.getElementById(`removePhoto${slotIndex}`).hidden = true;
+      markObservation();
     }
 
     async function compressImage(blob, baseName) {
@@ -675,18 +693,21 @@
       return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
     }
 
-    async function uploadPhoto(photo = selectedPhotoBlob) {
+    async function uploadPhoto(photo, observation, slotNumber) {
       if (!photo) {
         return null;
       }
-
+      const stamp = timestampString();
+      const captured = new Date(observation?.timestamp || Date.now());
+      const date = Number.isNaN(captured.getTime()) ? stamp.slice(0, 10) : `${captured.getFullYear()}-${String(captured.getMonth()+1).padStart(2,"0")}-${String(captured.getDate()).padStart(2,"0")}`;
+      const folder = (observation?.folderName || "Unfiled").normalize("NFKD").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "unfiled";
+      const title = (observation?.title || "field-observation").normalize("NFKD").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 60) || "field-observation";
       const file = await compressImage(
-        photo,
-        `EcoExposure_FieldData_${timestampString()}`
+        photo.blob,
+        `Averitas_ELN_${title}_${stamp}`
       );
-
-      const path =
-        `${currentUser.id}/EcoExposure_FieldData_${timestampString()}.webp`;
+      const unique = globalThis.crypto?.randomUUID ? crypto.randomUUID().slice(0, 8) : String(Date.now());
+      const path = `${currentUser.id}/${folder}/${date}/${title}_photo-${slotNumber}_${stamp}_${unique}.webp`;
 
       const { error } =
         await supabaseClient.storage
@@ -721,19 +742,19 @@
         return;
       }
 
-      if (!selectedPhotoBlob && !notes) {
+      if (!selectedPhotos.some(Boolean) && !notes && latitude === null) {
         status.textContent =
-          "Add a photo or enter a note before saving.";
+          "Add a photo, location, or field note before saving.";
         return;
       }
 
       const savedObservation = observationSnapshot();
+      const photoPaths = [];
       try {
-        let photoPath = null;
-
-        if (savedObservation.photo) {
-          status.textContent = "Uploading photo...";
-          photoPath = await uploadPhoto(savedObservation.photo);
+        for (let i=0;i<savedObservation.photos.length;i++) {
+          const photo=savedObservation.photos[i];
+          status.textContent = `Uploading photo ${i+1} of ${savedObservation.photos.length}…`;
+          photoPaths.push(await uploadPhoto(photo, savedObservation, photo.slot+1));
         }
 
         status.textContent = "Saving entry...";
@@ -743,11 +764,13 @@
             .from(OTHER_DATA_TABLE)
             .insert({
               user_id: currentUser.id,
-              file_path: photoPath,
+              title: savedObservation.title || "Field observation",
+              file_path: photoPaths[0] || null,
+              photo_paths: photoPaths,
               notes: savedObservation.notes || null,
               latitude: savedObservation.latitude,
               longitude: savedObservation.longitude,
-              folder_id: document.getElementById("folderSelect").value || null,
+              folder_id: savedObservation.folderId,
               observed_at: savedObservation.timestamp
             });
 
@@ -762,12 +785,17 @@
         lastSavedObservation = savedObservation;
         // Preserve any new edits made while this save was in progress.
         const latest = observationSnapshot();
-        if (latest.photo === savedObservation.photo && latest.notes === savedObservation.notes &&
-            latest.latitude === savedObservation.latitude && latest.longitude === savedObservation.longitude) clearDraft(false);
+        if (latest.photos.length===savedObservation.photos.length && latest.photos.every((photo,i)=>photo.blob===savedObservation.photos[i].blob && photo.slot===savedObservation.photos[i].slot) && latest.title === savedObservation.title && latest.notes === savedObservation.notes &&
+            latest.latitude === savedObservation.latitude && latest.longitude === savedObservation.longitude && latest.folderId === savedObservation.folderId) clearDraft(false);
 
       } catch (e) {
         console.error(e);
-        status.textContent = e.message;
+        if(photoPaths.length){
+          try {
+            const {error:cleanupError}=await supabaseClient.storage.from(OTHER_DATA_BUCKET).remove(photoPaths);
+            status.textContent = e.message + (cleanupError ? ` Photos remain in Storage; cleanup failed: ${cleanupError.message}` : " Uploaded photos were removed because the entry did not save.");
+          } catch(cleanupError) { status.textContent=e.message+` Photos may remain in Storage; cleanup failed: ${cleanupError.message}`; }
+        }else status.textContent = e.message;
       }
     }
 
@@ -775,26 +803,22 @@
       observationTimestamp = null;
       if (updateStatus) { lastSavedObservation = null; markObservation(); observationTimestamp = null; }
       document.getElementById("notes").value = "";
-      document.getElementById("fileInput").value = "";
-
+      document.getElementById("noteTitle").value = "";
       latitude = null;
       longitude = null;
-      selectedPhotoBlob = null;
+      selectedPhotos = Array(5).fill(null);
+      for(let i=0;i<5;i++){
+        const preview=document.getElementById(`photoPreview${i}`);
+        if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);
+        delete preview.dataset.objectUrl;
+        preview.hidden=true;preview.style.display="none";preview.removeAttribute("src");
+        document.getElementById(`fileInput${i}`).value="";
+        document.getElementById(`photoStatus${i}`).textContent="No photo selected.";
+        document.getElementById(`removePhoto${i}`).hidden=true;
+      }
 
       document.getElementById("gpsStatus").textContent =
         "No GPS location captured yet.";
-
-      const preview = document.getElementById("photoPreview");
-
-      if (preview.dataset.objectUrl) {
-        URL.revokeObjectURL(preview.dataset.objectUrl);
-        delete preview.dataset.objectUrl;
-      }
-
-      preview.style.display = "none";
-      preview.removeAttribute("src");
-
-      document.getElementById("photoCaptured").style.display = "none";
 
       if (updateStatus) {
         document.getElementById("saveStatus").textContent =
@@ -813,11 +837,13 @@
     }
     async function buildObservationPDF(observation) {
       const logo = null; // Text branding keeps reports independent of missing image assets.
-      let photo = null;
-      if (observation.photo) {
-        const url = URL.createObjectURL(observation.photo);
-        try { photo = await loadReportImage(url); }
+      const photos = [];
+      for(const item of observation.photos||[]) {
+        const url = URL.createObjectURL(item.blob);
+        let image;
+        try { image = await loadReportImage(url); }
         finally { URL.revokeObjectURL(url); }
+        photos.push({image,slot:item.slot});
       }
       const pages = [];
       let canvas, ctx, y;
@@ -858,6 +884,9 @@
         }
       }
       newPage();
+      line('Observation title', true);
+      wrapped(observation.title || 'Field observation');
+      y += 18;
       line('Observation timestamp', true);
       wrapped(new Date(observation.timestamp).toLocaleString() + ' (' + observation.timestamp + ')');
       y += 18;
@@ -866,13 +895,16 @@
         ? 'Latitude: ' + observation.latitude.toFixed(6) + '   Longitude: ' + observation.longitude.toFixed(6)
         : 'Not captured');
       y += 18;
-      line('Photo', true);
-      if (photo) {
-        const scale = Math.min((width - 2 * margin) / photo.naturalWidth, 620 / photo.naturalHeight);
-        const w = photo.naturalWidth * scale, h = photo.naturalHeight * scale;
-        if (y + h + 30 > bottom) newPage();
-        ctx.drawImage(photo, margin, y, w, h); y += h + 45;
-      } else { line('No photo added'); y += 18; }
+      if (photos.length) {
+        for(const item of photos) {
+          const photo=item.image;
+          const scale = Math.min((width - 2 * margin) / photo.naturalWidth, 620 / photo.naturalHeight);
+          const w = photo.naturalWidth * scale, h = photo.naturalHeight * scale;
+          if (y + 36 + h + 30 > bottom) newPage();
+          line('Photo ' + (item.slot + 1), true);
+          ctx.drawImage(photo, margin, y, w, h); y += h + 45;
+        }
+      } else { line('No photos added'); y += 18; }
       line('Field notes', true);
       wrapped(observation.notes || 'No notes added');
       pages.push(canvas.toDataURL('image/jpeg', 0.92));
@@ -957,11 +989,13 @@
 
     async function renderObservationCard(observation) {
       const logo = null; // Text branding keeps reports independent of missing image assets.
-      let photo = null;
-      if (observation.photo) {
-        const url = URL.createObjectURL(observation.photo);
-        try { photo = await loadReportImage(url); }
+      const photos = [];
+      for(const item of observation.photos||[]) {
+        const url = URL.createObjectURL(item.blob);
+        let image;
+        try { image = await loadReportImage(url); }
         finally { URL.revokeObjectURL(url); }
+        photos.push({image,slot:item.slot});
       }
       const width = 1080, margin = 64, contentWidth = width - margin * 2;
       const measure = document.createElement('canvas').getContext('2d');
@@ -978,10 +1012,14 @@
         }
         return lines;
       }
+      const titleLines = wrap(observation.title || 'Field observation');
       const notes = wrap(observation.notes || 'No field notes added.');
-      const photoScale = photo ? Math.min(contentWidth / photo.naturalWidth, 720 / photo.naturalHeight) : 0;
-      const photoHeight = photo ? Math.round(photo.naturalHeight * photoScale) : 0;
-      const height = 640 + photoHeight + notes.length * 42;
+      const layoutPhotos=photos.map(item=>{
+        const scale=Math.min(contentWidth/item.image.naturalWidth,520/item.image.naturalHeight);
+        return {...item,width:Math.round(item.image.naturalWidth*scale),height:Math.round(item.image.naturalHeight*scale)};
+      });
+      const photoHeight=layoutPhotos.reduce((sum,item)=>sum+item.height+70,0);
+      const height = 690 + photoHeight + (notes.length + titleLines.length) * 42;
       if (height > 16000) throw new Error('These notes are too long for one image. Use Generate PDF & Share for the complete observation.');
       const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
@@ -990,18 +1028,23 @@
       const logoScale = Math.min(240 / (logo ? logo.naturalWidth : 300), 100 / (logo ? logo.naturalHeight : 100));
       if (logo) ctx.drawImage(logo, margin, 42, (logo ? logo.naturalWidth : 300) * logoScale, (logo ? logo.naturalHeight : 100) * logoScale);
       ctx.fillStyle = '#115e59'; ctx.font = 'bold 42px Arial'; ctx.fillText('Field Observation', margin, 208);
+      ctx.fillStyle = '#1f2933'; ctx.font = 'bold 30px Arial';
+      titleLines.forEach((line, index) => ctx.fillText(line, margin, 250 + index * 38));
       ctx.fillStyle = '#4b5563'; ctx.font = '24px Arial';
-      ctx.fillText('Captured: ' + new Date(observation.timestamp).toLocaleString(), margin, 256);
-      ctx.font = '22px Arial'; ctx.fillText('Timestamp: ' + observation.timestamp, margin, 292);
+      const detailY = 256 + titleLines.length * 38;
+      ctx.fillText('Captured: ' + new Date(observation.timestamp).toLocaleString(), margin, detailY);
+      ctx.font = '22px Arial'; ctx.fillText('Timestamp: ' + observation.timestamp, margin, detailY + 36);
       const gps = Number.isFinite(observation.latitude) && Number.isFinite(observation.longitude)
         ? observation.latitude.toFixed(6) + ', ' + observation.longitude.toFixed(6) : 'Not captured';
-      ctx.fillText('GPS: ' + gps, margin, 330);
-      let y = 382;
-      if (photo) {
-        const photoWidth = Math.round(photo.naturalWidth * photoScale);
-        ctx.drawImage(photo, (width - photoWidth) / 2, y, photoWidth, photoHeight);
-        y += photoHeight + 54;
-      } else { ctx.fillText('No photo added', margin, y); y += 54; }
+      ctx.fillText('GPS: ' + gps, margin, detailY + 74);
+      let y = detailY + 126;
+      if (layoutPhotos.length) {
+        ctx.font='bold 24px Arial';
+        for(const item of layoutPhotos){
+          ctx.fillStyle='#115e59';ctx.fillText('Photo '+(item.slot+1),margin,y);y+=34;
+          ctx.drawImage(item.image,(width-item.width)/2,y,item.width,item.height);y+=item.height+36;
+        }
+      } else { ctx.fillText('No photos added', margin, y); y += 54; }
       ctx.fillStyle = '#115e59'; ctx.font = 'bold 28px Arial'; ctx.fillText('Field Notes', margin, y); y += 46;
       ctx.fillStyle = '#1f2933'; ctx.font = '28px Arial';
       for (const line of notes) { ctx.fillText(line, margin, y); y += 42; }

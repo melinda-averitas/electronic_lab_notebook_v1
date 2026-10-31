@@ -229,8 +229,8 @@
   </main>
 
   <script>
-    const SUPABASE_URL = "https://qximbeodwjhxuzcqenvs.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_y5c-8UikxGZZJzyea0lG6g_TibWgKPW";
+    const SUPABASE_URL = "https://wpavjglhayzqyxnhceip.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_so12Fczumz73kItENFdnrA_XSaNN1d3";
     const TABLE_NAME = "samples";
     const BUCKET_NAME = "ecoexposure_images";
 
@@ -291,7 +291,7 @@
       authStatus.textContent = "Sending password reset email...";
 
       const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: "https://field-app.ecoterahome.com/reset-password.html"
+        redirectTo: "https://melinda-ecoteraasia.github.io/ecoexposure-webapp_v1/reset-password.html"
       });
 
       if (error) {

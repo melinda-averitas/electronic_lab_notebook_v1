@@ -24,7 +24,7 @@
 <body>
 <header><h1>R&amp;D Folders</h1><p>Keep separate experimental programs organized in one notebook.</p></header>
 <main>
-  <nav class="top-nav" aria-label="Notebook navigation"><a href="index.html">Home</a><a href="new_field_data.html">Field Data</a><a href="my-field-data.html">My Field Data</a><a href="login.html">Sign in</a></nav>
+  <nav class="top-nav" aria-label="Notebook navigation"><a href="index.html">Home</a><a href="new_field_data.html">Field Data</a><a href="my-field-data.html">My Field Data</a><a href="login.html?next=folders.html">Sign in</a></nav>
   <section>
     <h2>Create a folder</h2>
     <form id="folderForm">
@@ -46,15 +46,25 @@ let currentUser=null;
 const statusBox=document.getElementById("folderStatus");
 function esc(value){return String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 async function requireLogin(){
-  const {data,error}=await supabaseClient.auth.getUser();
-  if(error||!data.user){statusBox.textContent="Sign in to create and manage your folders.";return false}
-  currentUser=data.user;return true;
+  try {
+    const {data,error}=await supabaseClient.auth.getUser();
+    if(error||!data.user){
+      statusBox.textContent="Sign in to create and manage your folders.";
+      document.getElementById("folderList").innerHTML='<div class="empty">Your folders will appear here after you sign in. <a href="login.html?next=folders.html">Sign in</a></div>';
+      return false;
+    }
+    currentUser=data.user;return true;
+  } catch(error) {
+    statusBox.textContent="Could not check your sign-in: "+error.message;
+    document.getElementById("folderList").innerHTML='<div class="empty">Could not check sign-in. Refresh this page or sign in again.</div>';
+    return false;
+  }
 }
 async function loadFolders(){
   if(!await requireLogin())return;
   const {data,error}=await supabaseClient.from("folders").select("id,name,created_at").eq("user_id",currentUser.id).order("name");
-  if(error){statusBox.textContent="Could not load folders: "+error.message;return}
   const box=document.getElementById("folderList");
+  if(error){statusBox.textContent="Could not load folders: "+error.message;box.innerHTML='<div class="empty">Folder request failed. Check the folders table and its signed-in-user read policy in Supabase.</div>';return}
   if(!data?.length){box.innerHTML='<div class="empty">No folders yet. Create one above to organize your experiments.</div>';statusBox.textContent="No folders created yet.";return}
   box.replaceChildren();
   for(const folder of data){
@@ -76,10 +86,12 @@ async function createFolder(event){
   const input=document.getElementById("folderName"),name=input.value.trim();
   if(!name){statusBox.textContent="Enter a folder name.";return}
   const button=document.getElementById("createFolderButton");button.disabled=true;
-  const {error}=await supabaseClient.from("folders").insert({user_id:currentUser.id,name});
-  button.disabled=false;
-  if(error){statusBox.textContent=error.message.includes("folders_owner_name_unique")?"You already have a folder with that name.":"Could not create folder: "+error.message;return}
-  input.value="";statusBox.textContent="Folder created.";await loadFolders();
+  try {
+    const {error}=await supabaseClient.from("folders").insert({user_id:currentUser.id,name});
+    if(error){statusBox.textContent=error.message.includes("folders_owner_name_unique")?"You already have a folder with that name.":"Could not create folder: "+error.message;return}
+    input.value="";statusBox.textContent="Folder created.";await loadFolders();
+  } catch(error) { statusBox.textContent="Could not create folder: "+error.message; }
+  finally { button.disabled=false; }
 }
 async function renameFolder(folder){
   const name=prompt("Rename folder",folder.name)?.trim();
@@ -89,7 +101,7 @@ async function renameFolder(folder){
   statusBox.textContent="Folder renamed.";await loadFolders();
 }
 document.getElementById("folderForm").addEventListener("submit",createFolder);
-loadFolders().catch(error=>{statusBox.textContent="Could not load folders: "+error.message});
+loadFolders().catch(error=>{statusBox.textContent="Could not load folders: "+error.message;document.getElementById("folderList").innerHTML='<div class="empty">Folder loading failed. Refresh this page and retry.</div>';});
 </script>
 </body>
 </html>
