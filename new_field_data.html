@@ -293,6 +293,9 @@
       <img id="cardPreview" alt="Completed observation card preview" hidden style="width:100%;margin-top:14px;border-radius:10px;border:1px solid var(--border)">
       <button id="shareImageButton" type="button" onclick="shareObservationImage()" hidden>Share Observation</button>
       <button id="downloadImageButton" class="secondary" type="button" onclick="downloadObservationImage()" hidden>Download Observation Image</button>
+      <button id="saveObservationCardsButton" type="button" onclick="saveObservationCards()">Save observation cards</button>
+      <p>Save the complete card image to your account’s Observation Cards folder.</p>
+      <div id="cardSaveStatus" class="status" role="status" aria-live="polite"></div>
       <div id="imageStatus" class="status" role="status" aria-live="polite"></div>
       <details style="margin-top:16px"><summary>Email a copy to yourself</summary>
 
@@ -307,6 +310,9 @@
       <button id="pdfButton" type="button" onclick="generatePDF()">Generate PDF report</button>
       <button id="sharePDFButton" type="button" onclick="sharePreparedPDF()" hidden>Share PDF</button>
       <button id="downloadPDFButton" class="secondary" type="button" onclick="downloadPreparedPDF()" hidden>Download PDF</button>
+      <button id="savePDFButton" type="button" onclick="savePDFToSupabase()">Save PDF to Supabase</button>
+      <p>Save a PDF copy under your selected folder and observation date.</p>
+      <div id="pdfSaveStatus" class="status" role="status" aria-live="polite"></div>
       <div id="pdfStatus" class="status" role="status" aria-live="polite"></div>
       <div class="info-box">Field observation only — not a laboratory analytical result.</div>
       <div id="saveStatus" class="status">Observations stay on this page until you clear or leave it.</div>
@@ -964,6 +970,57 @@
       } catch (e) { status.textContent = 'PDF could not be generated: ' + e.message; }
       finally { button.disabled = false; }
     }
+    let pdfSaveBusy = false;
+    const savedPDFs = new Map();
+
+    function pdfStoragePath(userId, observation, id) {
+      const slug = (value, fallback) => (value || fallback).normalize('NFKD')
+        .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || fallback;
+      const captured = new Date(observation.timestamp);
+      if (Number.isNaN(captured.getTime())) throw new Error('Observation date is invalid.');
+      const day = captured.getFullYear() + '-' + String(captured.getMonth()+1).padStart(2,'0')
+        + '-' + String(captured.getDate()).padStart(2,'0');
+      const folder = slug(observation.folderName, 'unfiled');
+      const title = slug(observation.title, 'field-observation').slice(0,60);
+      return userId + '/observation-pdfs/' + folder + '/' + day + '/' + title + '_' + id + '.pdf';
+    }
+
+    async function savePDFToSupabase() {
+      if (pdfSaveBusy) return;
+      const status = document.getElementById('pdfSaveStatus');
+      const button = document.getElementById('savePDFButton');
+      const observation = observationSnapshot();
+      if (!observation) { status.textContent = 'Add a photo, GPS location or notes first.'; return; }
+      pdfSaveBusy = true; button.disabled = true;
+      const revision = cardRevision;
+      try {
+        if (!supabaseClient) throw new Error('Account connection unavailable. You can still download the PDF.');
+        status.textContent = 'Checking sign-in…';
+        const {data, error} = await supabaseClient.auth.getUser();
+        if (error || !data?.user) throw new Error('Sign in to save a PDF, then return to this tab.');
+        const userId = data.user.id;
+        const key = JSON.stringify([userId, revision, observation.timestamp, observation.folderId, observation.folderName]);
+        if (savedPDFs.has(key)) {
+          status.textContent = 'This PDF is already saved: ' + savedPDFs.get(key); return;
+        }
+        status.textContent = 'Preparing PDF…';
+        const blob = await buildObservationPDF(observation);
+        const latest = observationSnapshot();
+        if (revision !== cardRevision || latest?.folderId !== observation.folderId || latest?.folderName !== observation.folderName)
+          throw new Error('Observation or folder changed. Save again to include your latest selection.');
+        const path = pdfStoragePath(userId, observation, crypto.randomUUID());
+        status.textContent = 'Uploading PDF…';
+        const upload = await supabaseClient.storage.from(OTHER_DATA_BUCKET).upload(path, blob,
+          {contentType: 'application/pdf', cacheControl: '3600', upsert: false});
+        if (upload.error) throw upload.error;
+        savedPDFs.set(key, path);
+        status.textContent = 'PDF saved to your account: ' + path;
+      } catch (error) {
+        status.textContent = 'PDF save was not confirmed: ' + error.message
+          + ' You can still download the PDF. Check Storage before retrying if the connection was interrupted.';
+      } finally { pdfSaveBusy = false; button.disabled = false; }
+    }
+
     function downloadPreparedPDF() {
       if (!preparedPDF) return;
       const url = URL.createObjectURL(preparedPDF), link = document.createElement('a');
@@ -1057,6 +1114,97 @@
       if (!blob) throw new Error('Your browser could not create the image. Try the PDF option.');
       return blob;
     }
+    let cardSaveBusy = false;
+    const savedCardRevisions = new Map();
+
+    async function observationCardsFolder(userId) {
+      const find = () => supabaseClient.from(FOLDERS_TABLE).select('id')
+        .eq('user_id', userId).eq('name', 'Observation Cards').maybeSingle();
+      let result = await find();
+      if (result.error) throw result.error;
+      if (result.data) return result.data.id;
+      result = await supabaseClient.from(FOLDERS_TABLE)
+        .insert({user_id: userId, name: 'Observation Cards'}).select('id').single();
+      if (!result.error) return result.data.id;
+      if (result.error.code !== '23505') throw result.error;
+      // Another tab may have created the same folder during this request.
+      result = await find();
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error('Could not find the Observation Cards folder.');
+      return result.data.id;
+    }
+
+    async function saveObservationCards() {
+      if (cardSaveBusy) return;
+      const status = document.getElementById('cardSaveStatus');
+      const button = document.getElementById('saveObservationCardsButton');
+      const observation = observationSnapshot();
+      if (!observation) { status.textContent = 'Add a photo, GPS location or notes first.'; return; }
+      cardSaveBusy = true; button.disabled = true;
+      const revision = cardRevision;
+      let path = null, rowId = null, userId = null, uploaded = false;
+      try {
+        if (!supabaseClient) throw new Error('Account connection unavailable. Your draft is still here.');
+        status.textContent = 'Checking sign-in…';
+        const {data, error} = await supabaseClient.auth.getUser();
+        if (error || !data?.user) throw new Error('Sign in to save observation cards, then return to this tab.');
+        userId = data.user.id;
+        const key = userId + ':' + revision;
+        if (savedCardRevisions.has(key)) {
+          status.textContent = 'This card is already saved in Observation Cards.'; return;
+        }
+        status.textContent = 'Creating observation card…';
+        const blob = await renderObservationCard(observation);
+        if (revision !== cardRevision) throw new Error('Observation changed. Save again to include your latest details.');
+        const folderId = await observationCardsFolder(userId);
+        rowId = crypto.randomUUID();
+        const day = observation.timestamp.slice(0, 10);
+        path = userId + '/observation-cards/' + day + '/' + rowId + '.png';
+        status.textContent = 'Uploading observation card…';
+        const upload = await supabaseClient.storage.from(OTHER_DATA_BUCKET).upload(path, blob,
+          {contentType: 'image/png', cacheControl: '3600', upsert: false});
+        if (upload.error) throw upload.error;
+        uploaded = true;
+        const record = await supabaseClient.from(OTHER_DATA_TABLE).insert({
+          id: rowId, user_id: userId, folder_id: folderId,
+          title: (observation.title || 'Field observation') + ' — Observation Card',
+          file_path: path, photo_paths: [path], notes: observation.notes || null,
+          latitude: observation.latitude, longitude: observation.longitude,
+          observed_at: observation.timestamp
+        });
+        if (record.error) throw record.error;
+        savedCardRevisions.set(key, rowId);
+        status.textContent = 'Observation card saved. Open My Field Data and choose Observation Cards.';
+        loadFolderOptions().catch(() => {});
+      } catch (error) {
+        // A lost response can follow a committed insert. Check before deleting its file.
+        if (uploaded && rowId) {
+          try {
+            const check = await supabaseClient.from(OTHER_DATA_TABLE).select('id')
+              .eq('id', rowId).eq('user_id', userId).maybeSingle();
+            if (!check.error && check.data) {
+              savedCardRevisions.set(userId + ':' + revision, rowId);
+              status.textContent = 'Observation card saved in Observation Cards.'; return;
+            }
+            if (!check.error && !check.data) {
+              const cleanup = await supabaseClient.storage.from(OTHER_DATA_BUCKET).remove([path]);
+              if (cleanup.error) {
+                status.textContent = 'The card uploaded, but its My Data entry failed. A file remains at ' + path + '. ' + error.message;
+                return;
+              }
+            } else {
+              status.textContent = 'Could not confirm the saved entry. Check Observation Cards before retrying. File: ' + path;
+              return;
+            }
+          } catch {
+            status.textContent = 'Could not confirm the saved entry. Check Observation Cards before retrying. File: ' + path;
+            return;
+          }
+        }
+        status.textContent = 'Could not save observation card: ' + error.message;
+      } finally { cardSaveBusy = false; button.disabled = false; }
+    }
+
     async function prepareObservationImage() {
       const status = document.getElementById('imageStatus'), button = document.getElementById('imageButton');
       const observation = observationSnapshot();
