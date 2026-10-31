@@ -231,7 +231,7 @@ const LOGIN_RETURN_PAGE = allowedReturnPages.includes(requestedReturnPage) ? req
 const LOGIN_REDIRECT_URL = new URL(LOGIN_RETURN_PAGE, window.location.href).toString();
 const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.location.href).toString();
 
-    const supabaseClient = window.supabase.createClient(
+    const supabaseClient = window.supabase ? window.supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY,
       {
@@ -241,9 +241,27 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
           detectSessionInUrl: true
         }
       }
-    );
+    ) : null;
 
     let currentUser = null;
+    let authOperationPending = false;
+
+    async function runAuthOperation(operation) {
+      if (authOperationPending) return;
+      authOperationPending = true;
+      const buttons = [...document.querySelectorAll('.actions button')];
+      buttons.forEach(button => button.disabled = true);
+      const timer = setTimeout(() => {
+        getStatusElement().textContent = 'Supabase has not completed this request after 20 seconds. Account creation or login is not confirmed. Check your inbox and Supabase Auth users before retrying. If this persists, try a private browser window and inspect the browser Network panel.';
+      }, 20000);
+      try { return await operation(); }
+      finally {
+        clearTimeout(timer);
+        authOperationPending = false;
+        buttons.forEach(button => button.disabled = false);
+      }
+    }
+
 
     function getStatusElement() {
       return document.getElementById("authStatus");
@@ -261,13 +279,25 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
       return document.getElementById("password").value;
     }
 
+    function accountAvailable() {
+      if (supabaseClient) return true;
+      getStatusElement().textContent = "Account connection unavailable. Reload the page and check your internet connection.";
+      return false;
+    }
+
+    function authErrorMessage(error) {
+      return error.message + (error.code ? " (" + error.code + ")" : "");
+    }
+
     async function checkAuth() {
+      if (!accountAvailable()) return;
       const status = getStatusElement();
 
       try {
         const { data, error } =
           await supabaseClient.auth.getUser();
 
+        if (authOperationPending) return;
         if (error) {
           currentUser = null;
           status.textContent =
@@ -275,12 +305,14 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
           return;
         }
 
+        if (authOperationPending) return;
         currentUser = data.user || null;
 
         status.textContent = currentUser
           ? `Logged in as ${currentUser.email}`
           : "Not logged in.";
       } catch (error) {
+        if (authOperationPending) return;
         currentUser = null;
         status.textContent =
           "Authentication check failed: " + error.message;
@@ -288,6 +320,11 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
     }
 
     async function signUp() {
+      return runAuthOperation(signUpRequest);
+    }
+
+    async function signUpRequest() {
+      if (!accountAvailable()) return;
       const status = getStatusElement();
       const email = getEmail();
       const password = getPassword();
@@ -320,11 +357,15 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
           console.error("Sign-up error:", error);
 
           status.textContent =
-            "Sign-up error: " + error.message;
+            "Sign-up error: " + authErrorMessage(error);
 
           return;
         }
 
+        if (!data?.user) {
+          status.textContent = "Sign-up returned no user. Account creation could not be confirmed.";
+          return;
+        }
         if (data.session) {
           currentUser = data.user;
 
@@ -336,7 +377,7 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
         }
 
         status.textContent =
-          "Account created. Check your email to confirm your account, then return and log in.";
+          "Sign-up request accepted. Check your email for a confirmation link. If you already have an account, log in or reset your password.";
       } catch (error) {
         console.error("Unexpected sign-up error:", error);
 
@@ -346,6 +387,11 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
     }
 
     async function signIn() {
+      return runAuthOperation(signInRequest);
+    }
+
+    async function signInRequest() {
+      if (!accountAvailable()) return;
       const status = getStatusElement();
       const email = getEmail();
       const password = getPassword();
@@ -369,11 +415,15 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
           console.error("Login error:", error);
 
           status.textContent =
-            "Login error: " + error.message;
+            "Login error: " + authErrorMessage(error);
 
           return;
         }
 
+        if (!data?.user || !data?.session) {
+          status.textContent = "Login returned no active session. Please try again.";
+          return;
+        }
         currentUser = data.user;
 
         status.textContent =
@@ -389,6 +439,11 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
     }
 
     async function forgotPassword() {
+      return runAuthOperation(forgotPasswordRequest);
+    }
+
+    async function forgotPasswordRequest() {
+      if (!accountAvailable()) return;
       const status = getStatusElement();
       const email = getEmail();
 
@@ -434,6 +489,11 @@ const PASSWORD_RESET_REDIRECT_URL = new URL("reset-password.html", window.locati
     }
 
     async function signOut() {
+      return runAuthOperation(signOutRequest);
+    }
+
+    async function signOutRequest() {
+      if (!accountAvailable()) return;
       const status = getStatusElement();
 
       try {
