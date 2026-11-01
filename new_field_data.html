@@ -225,6 +225,12 @@
     .bottom-nav .material-symbols-outlined{font-size:24px;line-height:1}
     .photo-slots{display:grid;gap:12px}.photo-slot{border:1px solid var(--border);border-radius:12px;padding:12px;background:#fbfdfc}.photo-slot h3{font-size:1rem;margin:0 0 8px}.photo-slot .preview{max-height:240px;margin-top:10px}.photo-slot .slot-status{font-size:.88rem;color:var(--muted);margin-top:8px}.photo-slot .remove-photo{width:auto;background:#eef2f1;color:var(--text);padding:8px 12px}
     [hidden]{display:none!important}p,li{line-height:1.5}summary{cursor:pointer;font-weight:700}li{margin-bottom:8px}button:disabled{opacity:.55;cursor:wait}
+    .account-save-button,
+    .account-save-button:hover,
+    .account-save-button:active {
+      background: #33CCCC;
+      color: #083344;
+    }
   </style>
 </head>
 
@@ -295,7 +301,7 @@
       <img id="cardPreview" alt="Completed observation card preview" hidden style="width:100%;margin-top:14px;border-radius:10px;border:1px solid var(--border)">
       <button id="shareImageButton" type="button" onclick="shareObservationImage()" hidden>Share Observation</button>
       <button id="downloadImageButton" class="secondary" type="button" onclick="downloadObservationImage()" hidden>Download Observation Image</button>
-      <button id="saveObservationCardsButton" type="button" onclick="saveObservationCards()">Save observation cards</button>
+      <button id="saveObservationCardsButton" class="account-save-button" type="button" onclick="saveObservationCards()">Save observation cards</button>
       <p>Save the complete card image to your account’s Observation Cards folder.</p>
       <div id="cardSaveStatus" class="status" role="status" aria-live="polite"></div>
       <div id="imageStatus" class="status" role="status" aria-live="polite"></div>
@@ -307,7 +313,7 @@
       <div class="info-box">Opens a draft in your email app. The PDF cannot be attached automatically by this button: download it first, then attach it before sending. Ecotera is copied only if you select the checkbox above.</div>
       <div id="emailStatus" class="status" role="status" aria-live="polite"></div>
       </details>
-      <details style="margin-top:16px"><summary>Save to your account</summary><p>Already signed in? Save this observation to My Data. Otherwise, <a href="login.html?next=new_field_data.html" target="_blank" rel="noopener">sign in or create an account in another tab</a>, then return here. Your draft stays in this tab.</p><button type="button" onclick="saveEntry()">Save to My Data</button></details><button class="secondary" type="button" onclick="if(confirm('Clear this observation? Download any reports you want to keep first.')) clearDraft()">Clear Current Draft</button>
+      <div style="margin-top:16px"><h3>Save to your account</h3><p>Already signed in? Save this observation to My Data. Otherwise, <a href="login.html?next=new_field_data.html" target="_blank" rel="noopener">sign in or create an account in another tab</a>, then return here. Your draft stays in this tab.</p><button class="account-save-button" type="button" onclick="saveEntry()">Save to My Data</button></div><button class="secondary" type="button" onclick="if(confirm('Clear this observation? Download any reports you want to keep first.')) clearDraft()">Clear Current Draft</button>
 
       <button id="pdfButton" type="button" onclick="generatePDF()">Generate PDF report</button>
       <button id="sharePDFButton" type="button" onclick="sharePreparedPDF()" hidden>Share PDF</button>
