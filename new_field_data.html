@@ -252,6 +252,23 @@
     </section>
 
     <section>
+      <h2>Note Title</h2>
+      <label for="noteTitle">Title or name for this observation</label>
+      <input id="noteTitle" type="text" maxlength="160" placeholder="e.g., E. coli membrane prototype — Run 1" autocomplete="off" />
+      <div class="info-box">Leave blank to use Note - YYYY-MM-DD HH:mm when saving, using your local time.</div>
+    </section>
+
+    <section>
+      <h2>Field Notes</h2>
+
+      <textarea
+        id="notes"
+        placeholder="Type or dictate field notes, observations, device readings, environmental conditions, or other information..."
+      ></textarea>
+      <div class="info-box">You can type or use your phone keyboard’s microphone to dictate notes.</div>
+    </section>
+
+    <section>
       <h2>Photos</h2>
       <p>Add up to five photos to this observation. Every slot is optional; leave any unused slot empty.</p>
       <div class="photo-slots">
@@ -270,22 +287,7 @@
       <div id="gpsStatus" class="info-box">No GPS location captured yet.</div>
     </section>
 
-    <section>
-      <h2>Note Title</h2>
-      <label for="noteTitle">Title or name for this observation</label>
-      <input id="noteTitle" type="text" maxlength="160" placeholder="e.g., E. coli membrane prototype — Run 1" autocomplete="off" />
-      <div class="info-box">Give the entry a short title so you can find it later. A photo can be saved with or without notes.</div>
-    </section>
 
-    <section>
-      <h2>Field Notes</h2>
-
-      <textarea
-        id="notes"
-        placeholder="Type or dictate field notes, observations, device readings, environmental conditions, or other information..."
-      ></textarea>
-      <div class="info-box">You can type or use your phone keyboard’s microphone to dictate notes.</div>
-    </section>
 
     <section>
       <h2>Share Observation</h2>
@@ -442,11 +444,20 @@
       if ([...select.options].some(option => option.value === selected)) select.value = selected;
       status.textContent = data?.length ? `${data.length} folder${data.length === 1 ? "" : "s"} available.` : "No folders yet. Create one to organize this observation.";
     }
-    function observationSnapshot() {
+    function defaultNoteTitle(date = new Date()) {
+      const pad = value => String(value).padStart(2, '0');
+      return `Note - ${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+    function observationSnapshot(forSave = false) {
       const notes = document.getElementById('notes').value.trim();
-      const title = document.getElementById('noteTitle').value.trim();
+      let title = document.getElementById('noteTitle').value; 
       const photos = selectedPhotos.map((blob,slot)=>blob?{blob,slot}:null).filter(Boolean);
-      if (photos.length || notes || title || latitude !== null) {
+      if (photos.length || notes || title.trim() || latitude !== null) {
+        if (forSave && !title.trim()) {
+          title = defaultNoteTitle();
+          document.getElementById('noteTitle').value = title;
+          markObservation();
+        }
         observationTimestamp ||= new Date().toISOString();
         return {photos, title, notes, latitude, longitude, timestamp: observationTimestamp, folderId: document.getElementById("folderSelect").value || null, folderName: document.getElementById("folderSelect").selectedOptions[0]?.textContent || "Unfiled"};
       }
@@ -754,7 +765,7 @@
         return;
       }
 
-      const savedObservation = observationSnapshot();
+      const savedObservation = observationSnapshot(true);
       const photoPaths = [];
       try {
         for (let i=0;i<savedObservation.photos.length;i++) {
@@ -989,7 +1000,7 @@
       if (pdfSaveBusy) return;
       const status = document.getElementById('pdfSaveStatus');
       const button = document.getElementById('savePDFButton');
-      const observation = observationSnapshot();
+      const observation = observationSnapshot(true);
       if (!observation) { status.textContent = 'Add a photo, GPS location or notes first.'; return; }
       pdfSaveBusy = true; button.disabled = true;
       const revision = cardRevision;
@@ -1138,7 +1149,7 @@
       if (cardSaveBusy) return;
       const status = document.getElementById('cardSaveStatus');
       const button = document.getElementById('saveObservationCardsButton');
-      const observation = observationSnapshot();
+      const observation = observationSnapshot(true);
       if (!observation) { status.textContent = 'Add a photo, GPS location or notes first.'; return; }
       cardSaveBusy = true; button.disabled = true;
       const revision = cardRevision;
