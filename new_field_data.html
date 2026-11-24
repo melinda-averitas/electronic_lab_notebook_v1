@@ -306,7 +306,18 @@
           </div>
           <button class="secondary" type="button" onclick="loadClarityPhoto()">Load selected photo &amp; choose ROI</button>
           <div id="qcStage" class="qc-stage" hidden><canvas id="qcCanvas" class="qc-canvas" aria-label="Photograph, drag to select supernatant region"></canvas></div>
+          <div class="button-row" style="margin-top:10px">
+            <button class="secondary" type="button" onclick="setClarityRoiMode('sample')">Select liquid ROI</button>
+            <button class="secondary" type="button" onclick="setClarityRoiMode('background')">Select background ROI (optional)</button>
+          </div>
           <p class="status" id="qcRoiStatus" role="status">Load a photo, then drag over the supernatant to select a rectangular ROI.</p>
+          <p class="status">Optional background ROI: choose an adjacent area under comparable lighting, excluding shadows and tube edges. It helps document illumination differences; it does <strong>not</strong> directly yield NTU or calibrated haze.</p>
+          <p style="margin:10px 0 4px"><strong>Color references</strong> (descriptive comparisons only)</p>
+          <div class="qc-controls" style="margin-bottom:10px">
+            <div style="background:white;padding:10px;border:1px solid #ddd;border-radius:8px"><span style="display:inline-block;background:#FFFFFF;border:1px solid #aaa;width:20px;height:20px;vertical-align:middle"></span> White <code>#FFFFFF</code></div>
+            <div style="background:white;padding:10px;border:1px solid #ddd;border-radius:8px"><span style="display:inline-block;background:#9F9C8C;border:1px solid #aaa;width:20px;height:20px;vertical-align:middle"></span> Nov 23 photo <code>#9F9C8C</code></div>
+          </div>
+          <p class="status">Color distance percentages are normalized RGB differences, not percentages of cloudiness. Texture metrics are exploratory visual proxies, not particle counts. The Nov 23 HEX is an approximate mean from a selected liquid region of the photo associated with ~13% lower blank-corrected OD595, not a calibrated clear-water standard. Lighting and background affect both comparisons.</p>
           <button type="button" onclick="analyzeClarity()">Analyze Clarity</button>
           <div id="qcOutput" hidden>
             <h3>Image metrics</h3>
@@ -446,8 +457,21 @@
     let clarityAnalyses = [];
     let clarityWorking = null;
     let claritySelection = null;
+    let clarityBackgroundSelection = null;
+    let clarityRoiMode = 'sample';
     let clarityDrag = null;
-    const CLARITY_VERSION = 'clarity-0.1';
+    const CLARITY_VERSION = 'clarity-0.3';
+    // Empirical reference: central liquid ROI, IMG_6767(1).jpeg (Nov 23, 2026).
+    // Source ROI x=560..625, y=720..840 px in 1152x1536 photo; approximate RGB.
+    const CLARITY_REFERENCES = {white:{rgb:[255,255,255],hex:'#FFFFFF',label:'Theoretical white'}, empirical:{rgb:[159,156,140],hex:'#9F9C8C',label:'Nov 23 acceptable-preparation photo (provisional)'}};
+    const clarityColorDistance=(a,b)=>Number(Math.sqrt(a.reduce((sum,v,i)=>sum+(v-b[i])**2,0)).toFixed(2));
+    const clarityColorPercent=(a,b)=>Number((100*Math.sqrt(a.reduce((sum,v,i)=>sum+(v-b[i])**2,0))/(255*Math.sqrt(3))).toFixed(2));
+    function setClarityRoiMode(mode) {
+      clarityRoiMode = mode;
+      document.getElementById('qcRoiStatus').textContent = mode === 'sample'
+        ? 'Drag on the photograph to select the LIQUID ROI (green).'
+        : 'Drag to select an optional nearby BACKGROUND ROI (blue). Avoid strong shadows.';
+    }
     let cameraTargetSlot = 0;
     let observationTimestamp = null;
     let lastSavedObservation = null;
@@ -509,6 +533,7 @@
       if (Number(document.getElementById('qcPhotoSlot').value) === slot) {
         clarityWorking = null;
         claritySelection = null;
+        clarityBackgroundSelection = null;
         document.getElementById('qcStage').hidden = true;
         document.getElementById('qcOutput').hidden = true;
       }
@@ -522,10 +547,16 @@
         `Photo slot: ${r.photo_slot} | Analysis time: ${r.analyzed_at}`,
         `ROI normalized (x,y,w,h): ${[r.roi.x,r.roi.y,r.roi.width,r.roi.height].map(v=>v.toFixed(5)).join(', ')}`,
         `Mean RGB: ${m.rgb.join(', ')} | HEX: ${m.hex}`,
+        `Reference A theoretical white: #FFFFFF | RGB color distance: ${m.distance_to_white_rgb} / 441.67 (${m.white_color_distance_pct}%)`,
+        `Reference B Nov 23 photo ROI: #9F9C8C | RGB color distance: ${m.distance_to_empirical_rgb} / 441.67 (${m.empirical_color_distance_pct}%)`,
+        'RGB percentages are normalized color distances, NOT percent cloudiness or percent particulate.',
         `Mean grayscale (0-255): ${m.mean_grayscale} | Mean relative luminance: ${m.mean_luminance}`,
         `Grayscale SD: ${m.grayscale_sd} | Grayscale CV: ${m.grayscale_cv}`,
         `Mean local gradient: ${m.mean_gradient} | Contrast (P90-P10): ${m.percentile_contrast}`,
-        'Background/haze contrast: Not measured; no standardized reference background selected',
+        `Visible fine-texture proxy: ${m.fine_texture_pct}% of sampled interior pixels above local deviation threshold ${m.fine_texture_threshold_gray} gray levels (non-specific)`,
+        `Selected background ROI normalized: ${r.background_roi ? [r.background_roi.x,r.background_roi.y,r.background_roi.width,r.background_roi.height].map(v=>v.toFixed(5)).join(', ') : 'Not selected'}`,
+        `Adjacent background mean gray: ${m.background_mean_gray ?? 'Not selected'} | Sample minus background mean gray: ${m.sample_background_delta_gray ?? 'Not measured'}`,
+        'Calibrated haze, contrast retention, and NTU: Not measured; matched optical target/calibration required',
         `Automated QC: ${r.auto_qc} (exploratory, unvalidated)`,
         `Operator QC: ${r.operator_qc} | Override reason: ${r.override_reason || 'None'}`,
         `Operator comment: ${r.comment || 'None'}`,
@@ -540,6 +571,13 @@
       const img = clarityWorking.image;
       canvas.width = img.width; canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
+      if (clarityBackgroundSelection) {
+        const b = clarityBackgroundSelection;
+        ctx.fillStyle = 'rgba(37,99,235,.12)';
+        ctx.fillRect(b.x*canvas.width,b.y*canvas.height,b.width*canvas.width,b.height*canvas.height);
+        ctx.lineWidth = Math.max(2,canvas.width/300); ctx.strokeStyle='#2563eb';
+        ctx.strokeRect(b.x*canvas.width,b.y*canvas.height,b.width*canvas.width,b.height*canvas.height);
+      }
       if (claritySelection) {
         const r = claritySelection;
         ctx.fillStyle = 'rgba(15,118,110,.15)'; ctx.fillRect(r.x*canvas.width,r.y*canvas.height,r.width*canvas.width,r.height*canvas.height);
@@ -559,7 +597,7 @@
         working.getContext('2d',{willReadFrequently:true}).drawImage(bmp,0,0,working.width,working.height);
         bmp.close?.();
         clarityWorking = {image:working, slot, blob:file};
-        claritySelection=null;latestClarityMetrics=null;
+        claritySelection=null;clarityBackgroundSelection=null;clarityRoiMode='sample';latestClarityMetrics=null;
         document.getElementById('qcOutput').hidden=true;
         document.getElementById('qcStage').hidden=false;
         drawClarityCanvas();
@@ -573,20 +611,24 @@
     const qcCanvas=document.getElementById('qcCanvas');
     qcCanvas.addEventListener('pointerdown',event=>{
       if(!clarityWorking)return;
-      clarityDrag=clarityPoint(event);claritySelection=null;latestClarityMetrics=null;document.getElementById('qcOutput').hidden=true;
+      clarityDrag=clarityPoint(event);if(clarityRoiMode==='sample')claritySelection=null;else clarityBackgroundSelection=null;latestClarityMetrics=null;document.getElementById('qcOutput').hidden=true;
       qcCanvas.setPointerCapture(event.pointerId);
     });
     qcCanvas.addEventListener('pointermove',event=>{
       if(!clarityDrag)return;
       const p=clarityPoint(event);
-      claritySelection={x:Math.min(clarityDrag.x,p.x),y:Math.min(clarityDrag.y,p.y),width:Math.abs(p.x-clarityDrag.x),height:Math.abs(p.y-clarityDrag.y)};
+      const roi={x:Math.min(clarityDrag.x,p.x),y:Math.min(clarityDrag.y,p.y),width:Math.abs(p.x-clarityDrag.x),height:Math.abs(p.y-clarityDrag.y)};
+      if(clarityRoiMode==='sample') claritySelection=roi; else clarityBackgroundSelection=roi;
       drawClarityCanvas();
     });
     function finishClarityROI(){
       if(!clarityDrag)return;
       clarityDrag=null;
-      if (claritySelection && claritySelection.width>=.01 && claritySelection.height>=.01) document.getElementById('qcRoiStatus').textContent='ROI selected. Press Analyze Clarity.';
-      else {claritySelection=null;document.getElementById('qcRoiStatus').textContent='ROI too small. Drag a larger rectangle.';}
+      const roi = clarityRoiMode==='sample' ? claritySelection : clarityBackgroundSelection;
+      if (roi && roi.width>=.01 && roi.height>=.01) document.getElementById('qcRoiStatus').textContent = clarityRoiMode==='sample'
+        ? 'Liquid ROI selected. Optionally select background, or press Analyze Clarity.'
+        : 'Background ROI selected. Select liquid ROI if needed, or press Analyze Clarity.';
+      else {if(clarityRoiMode==='sample')claritySelection=null;else clarityBackgroundSelection=null;document.getElementById('qcRoiStatus').textContent='ROI too small. Drag a larger rectangle.';}
       drawClarityCanvas();
     }
     qcCanvas.addEventListener('pointerup',finishClarityROI);
@@ -620,10 +662,36 @@
       }
       const sd=Math.sqrt(variance/n),sorted=Array.from(gray).sort((a,b)=>a-b);
       const p10=sorted[Math.floor((n-1)*.1)],p90=sorted[Math.floor((n-1)*.9)];
+      // Exploratory fine-texture proxy: count local grayscale deviations in the inner ROI.
+      // This includes bubbles, reflections, sensor noise, and patterns as well as potential particles.
+      const textureThreshold = 15;
+      let textureHits=0, textureCount=0;
+      for(let row=2;row<h-2;row+=2){
+        for(let col=2;col<w-2;col+=2){
+          const i=row*w+col;
+          let local=0;
+          for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)local+=gray[i+dy*w+dx];
+          local/=25;
+          if(Math.abs(gray[i]-local)>=textureThreshold)textureHits++;
+          textureCount++;
+        }
+      }
+      let backgroundMean=null, deltaBackground=null;
+      if(clarityBackgroundSelection){
+        const b=clarityBackgroundSelection;
+        const bx=Math.floor(b.x*image.width),by=Math.floor(b.y*image.height);
+        const bw=Math.min(image.width-bx,Math.max(1,Math.ceil(b.width*image.width)));
+        const bh=Math.min(image.height-by,Math.max(1,Math.ceil(b.height*image.height)));
+        const bp=image.getContext('2d',{willReadFrequently:true}).getImageData(bx,by,bw,bh).data;
+        let bgSum=0;
+        for(let j=0;j<bp.length;j+=4)bgSum+=.2126*bp[j]+.7152*bp[j+1]+.0722*bp[j+2];
+        backgroundMean=bgSum/(bw*bh);
+        deltaBackground=mean-backgroundMean;
+      }
       const rgb=sums.map(v=>Math.round(v/n));
       const hex='#'+rgb.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase();
       const round=(v,d=3)=>Number(v.toFixed(d));
-      latestClarityMetrics={rgb,hex,mean_grayscale:round(mean),mean_luminance:round(lumSum/n,5),grayscale_sd:round(sd),grayscale_cv:round(sd/Math.max(mean,.001),5),mean_gradient:round(gradient/Math.max(edges,1)),percentile_contrast:round(p90-p10)};
+      latestClarityMetrics={rgb,hex,mean_grayscale:round(mean),mean_luminance:round(lumSum/n,5),grayscale_sd:round(sd),grayscale_cv:round(sd/Math.max(mean,.001),5),mean_gradient:round(gradient/Math.max(edges,1)),percentile_contrast:round(p90-p10),distance_to_white_rgb:clarityColorDistance(rgb,CLARITY_REFERENCES.white.rgb),distance_to_empirical_rgb:clarityColorDistance(rgb,CLARITY_REFERENCES.empirical.rgb),white_color_distance_pct:clarityColorPercent(rgb,CLARITY_REFERENCES.white.rgb),empirical_color_distance_pct:clarityColorPercent(rgb,CLARITY_REFERENCES.empirical.rgb),fine_texture_pct:round(textureCount?100*textureHits/textureCount:0,2),fine_texture_threshold_gray:textureThreshold,background_mean_gray:backgroundMean===null?null:round(backgroundMean),sample_background_delta_gray:deltaBackground===null?null:round(deltaBackground),reference_white_hex:CLARITY_REFERENCES.white.hex,reference_empirical_hex:CLARITY_REFERENCES.empirical.hex,reference_empirical_source:"IMG_6767(1).jpeg, selected central liquid ROI x560:625 y720:840",reference_comparison_method:"Euclidean RGB distance (0 identical; maximum 441.67)"};
       document.getElementById('qcMetrics').textContent=[
         `RGB: ${rgb.join(', ')}       HEX: ${hex}`,
         `Grayscale mean: ${latestClarityMetrics.mean_grayscale} / 255`,
@@ -633,8 +701,12 @@
         `Mean local gradient: ${latestClarityMetrics.mean_gradient}`,
         `P90–P10 intensity contrast: ${latestClarityMetrics.percentile_contrast}`,
         `Selected ROI: ${w} × ${h} px`,
-        'Background contrast / haze: not measured without matched background',
-        'Reference comparison: not configured in v0.1'
+        `Fine-texture proxy: ${latestClarityMetrics.fine_texture_pct}% of sampled interior pixels (exploratory; not particle count)`,
+        `Nearby background mean gray: ${latestClarityMetrics.background_mean_gray ?? 'Not selected'}`,
+        `Liquid minus background mean gray: ${latestClarityMetrics.sample_background_delta_gray ?? 'Not measured'}`,
+        `Color difference vs white #FFFFFF: ${latestClarityMetrics.white_color_distance_pct}% (RGB distance ${latestClarityMetrics.distance_to_white_rgb})`,
+        `Color difference vs Nov 23 #9F9C8C: ${latestClarityMetrics.empirical_color_distance_pct}% (RGB distance ${latestClarityMetrics.distance_to_empirical_rgb})`,
+        'Color differences ≠ turbidity; shadows affect color. Contrast retention, calibrated haze, NTU NOT measured.' 
       ].join('\n');
       document.getElementById('qcAssessment').textContent='Review';
       document.getElementById('qcOutput').hidden=false;
@@ -649,7 +721,7 @@
       const reason=document.getElementById('qcOverrideReason').value.trim();
       if(override&&!reason){document.getElementById('qcRoiStatus').textContent='Enter an override reason before attaching.';return;}
       const number=clarityAnalyses.filter(r=>r.tube_id===tube).length+1;
-      clarityAnalyses.push({tube_id:tube,photo_slot:slot+1,roi:{...claritySelection},metrics:{...latestClarityMetrics},algorithm_version:CLARITY_VERSION,threshold_version:'none (exploratory)',auto_qc:'review',operator_qc:override?document.getElementById('qcOverrideStatus').value:'review',override_reason:override?reason:null,comment:document.getElementById('qcComment').value.trim(),analyzed_at:new Date().toISOString(),reassessment_number:number});
+      clarityAnalyses.push({tube_id:tube,photo_slot:slot+1,roi:{...claritySelection},background_roi:clarityBackgroundSelection?{...clarityBackgroundSelection}:null,metrics:{...latestClarityMetrics},algorithm_version:CLARITY_VERSION,threshold_version:'none (exploratory)',auto_qc:'review',operator_qc:override?document.getElementById('qcOverrideStatus').value:'review',override_reason:override?reason:null,comment:document.getElementById('qcComment').value.trim(),analyzed_at:new Date().toISOString(),reassessment_number:number});
       markObservation();
       document.getElementById('qcAttachedStatus').textContent=`${clarityAnalyses.length} QC analysis record(s) attached. They will be included in the Observation Card and existing saved notes.`;
       document.getElementById('qcRoiStatus').textContent='QC attached. Select another photo or ROI to reassess, or Create Observation Card.';
