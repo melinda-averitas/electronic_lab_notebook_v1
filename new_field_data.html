@@ -242,6 +242,7 @@
       background: #33CCCC;
       color: #083344;
     }
+    #blueSlots [hidden], #blueSlots > [hidden], #blueAdd[hidden] {display:none!important}
   </style>
 </head>
 
@@ -287,16 +288,21 @@
 
     <section>
       <h2>Photos</h2>
-      <p>Add up to five photos to this observation. Every slot is optional; leave any unused slot empty.</p>
+      <p>Add up to six photos to this observation. Every slot is optional; leave any unused slot empty.</p>
       <div class="photo-slots">
         <div class="photo-slot"><h3>Photo 1 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(0)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput0" type="file" accept="image/*" onchange="handleFileSelect(event,0)"></label></div><div id="photoStatus0" class="slot-status">No photo selected.</div><img id="photoPreview0" class="preview" alt="Photo 1 preview" hidden><button id="removePhoto0" class="remove-photo" type="button" onclick="clearPhoto(0)" hidden>Remove photo</button></div>
         <div class="photo-slot"><h3>Photo 2 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(1)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput1" type="file" accept="image/*" onchange="handleFileSelect(event,1)"></label></div><div id="photoStatus1" class="slot-status">No photo selected.</div><img id="photoPreview1" class="preview" alt="Photo 2 preview" hidden><button id="removePhoto1" class="remove-photo" type="button" onclick="clearPhoto(1)" hidden>Remove photo</button></div>
         <div class="photo-slot"><h3>Photo 3 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(2)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput2" type="file" accept="image/*" onchange="handleFileSelect(event,2)"></label></div><div id="photoStatus2" class="slot-status">No photo selected.</div><img id="photoPreview2" class="preview" alt="Photo 3 preview" hidden><button id="removePhoto2" class="remove-photo" type="button" onclick="clearPhoto(2)" hidden>Remove photo</button></div>
         <div class="photo-slot"><h3>Photo 4 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(3)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput3" type="file" accept="image/*" onchange="handleFileSelect(event,3)"></label></div><div id="photoStatus3" class="slot-status">No photo selected.</div><img id="photoPreview3" class="preview" alt="Photo 4 preview" hidden><button id="removePhoto3" class="remove-photo" type="button" onclick="clearPhoto(3)" hidden>Remove photo</button></div>
         <div class="photo-slot"><h3>Photo 5 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(4)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput4" type="file" accept="image/*" onchange="handleFileSelect(event,4)"></label></div><div id="photoStatus4" class="slot-status">No photo selected.</div><img id="photoPreview4" class="preview" alt="Photo 5 preview" hidden><button id="removePhoto4" class="remove-photo" type="button" onclick="clearPhoto(4)" hidden>Remove photo</button></div>
+        <div class="photo-slot"><h3>Photo 6 (optional)</h3><div class="button-row"><button type="button" onclick="openPhotoCamera(5)">📷 Take Photo</button><label class="file-button">📎 Choose Photo<input id="fileInput5" type="file" accept="image/*" onchange="handleFileSelect(event,5)"></label></div><div id="photoStatus5" class="slot-status">No photo selected.</div><img id="photoPreview5" class="preview" alt="Photo 6 preview" hidden><button id="removePhoto5" class="remove-photo" type="button" onclick="clearPhoto(5)" hidden>Remove photo</button></div>
       </div>
     </section>
 
+    <section><details id="blueModule"><summary>Module 2 · Post-Bradford blue QC</summary>
+<p>Photograph the control and each sample before plating. Drag inside the liquid to measure its color. Each sample is compared with the control in Photo 1.</p>
+<div id="blueSlots"></div><button type="button" id="blueAdd">Add another tube</button>
+</details></section>
     <section aria-labelledby="qcHeading">
       <details id="clarityDetails">
         <summary id="qcHeading">Supernatant Clarity QC (optional · exploratory)</summary>
@@ -304,7 +310,7 @@
           <p>Analyze a photo already added above, <strong>before</strong> creating/saving your Observation Card. Select a region inside the supernatant, excluding the glass, pellet, meniscus and bubbles. The original photo slot is not modified.</p>
           <div class="qc-controls">
             <div><label for="qcTube">Independent tube / preparation ID</label><input id="qcTube" placeholder="e.g., CYT-BSA-001" autocomplete="off"></div>
-            <div><label for="qcPhotoSlot">Photo to analyze</label><select id="qcPhotoSlot"><option value="0">Photo 1</option><option value="1">Photo 2</option><option value="2">Photo 3</option><option value="3">Photo 4</option><option value="4">Photo 5</option></select></div>
+            <div><label for="qcPhotoSlot">Photo to analyze</label><select id="qcPhotoSlot"><option value="0">Photo 1</option><option value="1">Photo 2</option><option value="2">Photo 3</option><option value="3">Photo 4</option><option value="4">Photo 5</option><option value="5">Photo 6</option></select></div>
           </div>
           <button class="secondary" type="button" onclick="loadClarityPhoto()">Load selected photo &amp; choose ROI</button>
           <div id="qcStage" class="qc-stage" hidden><canvas id="qcCanvas" class="qc-canvas" aria-label="Photograph, drag to select supernatant region"></canvas></div>
@@ -315,7 +321,7 @@
           <p class="status" id="qcRoiStatus" role="status">Load a photo, then drag over the supernatant to select a rectangular ROI.</p>
           <div id="qcCropPanel" class="qc-crop-panel" hidden>
             <strong>Cropped liquid ROI preview</strong>
-            <p class="status">This derivative shows exactly what will be analyzed. Your original photo is never changed. Optionally add the crop to one of the five existing photo slots.</p>
+            <p class="status">This derivative shows exactly what will be analyzed. Your original photo is never changed. Optionally add the crop to one of the six existing photo slots.</p>
             <canvas id="qcCropCanvas" class="qc-crop-preview" aria-label="Selected supernatant crop preview"></canvas>
             <div class="qc-controls" style="margin-top:10px">
               <div><label for="qcCropTarget">Save crop to an empty photo slot</label><select id="qcCropTarget"></select></div>
@@ -466,7 +472,7 @@
     let longitude = null;
     let photoStream = null;
     let cameraGeneration = 0;
-    let selectedPhotos = Array(5).fill(null);
+    let selectedPhotos = Array(6).fill(null);
     let clarityAnalyses = [];
     let clarityWorking = null;
     let claritySelection = null;
@@ -539,6 +545,7 @@
     }
     // QC v0.1: all computations happen in the browser; no new table or bucket.
     function invalidateClaritySlot(slot) {
+      clearBlueMeasurement(slot);
       if (clarityCropInfo && (clarityCropInfo.source_slot === slot || clarityCropInfo.crop_slot === slot)) clarityCropInfo = null;
       // Preserve measurements from original photos, but mark their optional crop as missing if removed.
       for (const rec of clarityAnalyses) if (rec.crop_photo_slot === slot + 1) rec.crop_photo_slot = null;
@@ -599,7 +606,7 @@
       const available=dropdown.options.length>0;
       document.getElementById('qcCropStatus').textContent = available
         ? 'Select an empty photo slot. The ROI crop is optional; original image remains in its current slot.'
-        : 'All five photo slots are occupied. You can analyze without saving a crop, or free an unused slot.';
+        : 'All six photo slots are occupied. You can analyze without saving a crop, or free an unused slot.';
     }
     function showClarityCrop() {
       if (!clarityWorking || !claritySelection || claritySelection.width<.01 || claritySelection.height<.01) {hideClarityCrop();return;}
@@ -735,7 +742,7 @@
     let latestClarityMetrics=null;
     function analyzeClarity() {
       if(!clarityWorking || !claritySelection){
-        const msg=!clarityWorking ? 'No photo loaded for QC. Choose Photo 1–5, then tap Load selected photo & choose ROI.' : 'No liquid ROI selected. Scroll up to the photo and drag a rectangle INSIDE the liquid; then press Analyze Clarity again.';
+        const msg=!clarityWorking ? 'No photo loaded for QC. Choose Photo 1–6, then tap Load selected photo & choose ROI.' : 'No liquid ROI selected. Scroll up to the photo and drag a rectangle INSIDE the liquid; then press Analyze Clarity again.';
         document.getElementById('qcRoiStatus').textContent=msg;clarityAnalyzeMessage(msg);return;
       }
       if(selectedPhotos[clarityWorking.slot]!==clarityWorking.blob){const msg='This photo changed. Load it again.';document.getElementById('qcRoiStatus').textContent=msg;clarityAnalyzeMessage(msg);return;}
@@ -835,7 +842,7 @@
     function observationSnapshot(forSave = false) {
       const enteredNotes = document.getElementById('notes').value.trim();
       const qcText = clarityAnalyses.length ? '\n\n' + clarityAnalyses.map(formatClarityRecord).join('\n\n') : '';
-      const notes = enteredNotes + qcText;
+      const notes = enteredNotes + qcText + blueNotes();
       let title = document.getElementById('noteTitle').value; 
       const photos = selectedPhotos.map((blob,slot)=>blob?{blob,slot}:null).filter(Boolean);
       if (photos.length || notes || title.trim() || latitude !== null) {
@@ -1212,7 +1219,8 @@
       document.getElementById("noteTitle").value = "";
       latitude = null;
       longitude = null;
-      selectedPhotos = Array(5).fill(null);
+      selectedPhotos = Array(6).fill(null);
+      resetBlue();
       clarityAnalyses = [];
       clarityWorking = null;
       claritySelection = null;
@@ -1222,7 +1230,7 @@
       document.getElementById('qcOutput').hidden = true;
       document.getElementById('qcStage').hidden = true;
       document.getElementById('qcAttachedStatus').textContent = 'No QC analyses attached yet.';
-      for(let i=0;i<5;i++){
+      for(let i=0;i<6;i++){
         const preview=document.getElementById(`photoPreview${i}`);
         if(preview.dataset.objectUrl)URL.revokeObjectURL(preview.dataset.objectUrl);
         delete preview.dataset.objectUrl;
@@ -1657,6 +1665,112 @@
     document.getElementById('photoDialog').addEventListener('cancel',e=>{e.preventDefault();closePhotoCamera();});
     document.addEventListener('visibilitychange',()=>{if(document.hidden)closePhotoCamera();});
     window.addEventListener('pagehide',()=>closePhotoCamera());
+
+    const blueSlots = document.getElementById('blueSlots');
+    const blueItems = [];
+    function blueLabel(item) {
+      return item.index ? item.label.value.trim() || 'Tube ' + item.index : 'No magnetite';
+    }
+    function blueReport(item) {
+      const ref = blueItems[0].measurement;
+      const m = item.measurement;
+      if (!m) return '';
+      const details = 'RGB ' + m.rgb.join(', ') + ' · ' + m.hex;
+      if (!item.index) return details;
+      return details + (ref ? ' · Distance from control: ' + clarityColorPercent(m.rgb, ref.rgb).toFixed(2) + '%' : ' · Select the control ROI to compare.');
+    }
+    function refreshBlue() {
+      for (const item of blueItems) item.output.textContent = blueReport(item);
+    }
+    function blueNotes() {
+      const rows = blueItems.filter(item => item.measurement).map(item =>
+        'Photo ' + (item.index + 1) + ' · ' + blueLabel(item) + ' · ' + blueReport(item) +
+        ' · ROI (x,y,w,h normalized): ' + item.measurement.roi.join(', '));
+      return rows.length ? '\n\nPOST-BRADFORD BLUE QC\n' + rows.join('\n') +
+        '\nDistance = Euclidean RGB distance as a percentage of the full RGB scale.' : '';
+    }
+    function drawBlue(item, rect) {
+      const { canvas, preview } = item;
+      if (!preview.naturalWidth || !selectedPhotos[item.index]) return;
+      const ctx = canvas.getContext('2d', {willReadFrequently:true});
+      ctx.drawImage(preview,0,0,canvas.width,canvas.height);
+      if (rect) {
+        ctx.strokeStyle = '#00db99'; ctx.lineWidth = Math.max(2,canvas.width/200);
+        ctx.strokeRect(...rect);
+      }
+    }
+    function clearBlueMeasurement(index) {
+      const item = blueItems[index];
+      item.measurement = null; item.start = null; item.rect = null; item.canvas.hidden = true;
+      refreshBlue();
+    }
+    function resetBlue() {
+      blueItems.forEach((item,index) => {
+        clearBlueMeasurement(index); item.section.hidden = index > 1;
+        if (index) item.label.value = 'Tube ' + index;
+      });
+      document.getElementById('blueAdd').hidden = false;
+    }
+    for (let index=0; index<6; index++) {
+      const section = document.createElement('div');
+      section.className = 'photo-slot'; section.hidden = index > 1;
+      section.innerHTML = '<h3></h3>' + (index ? '<label>Tube ID <input type="text"></label>' : '') +
+        '<button type="button">Choose photo</button><canvas hidden style="width:100%;height:auto;touch-action:none"></canvas><p aria-live="polite"></p>';
+      blueSlots.append(section);
+      section.querySelector('h3').textContent = index ? 'Photo ' + (index+1) + ' · Magnetite sample' : 'Photo 1 · No-magnetite reference';
+      const preview = document.getElementById('photoPreview'+index);
+      const canvas = section.querySelector('canvas');
+      const item = {index,section,preview,canvas,label:section.querySelector('input'),output:section.querySelector('p'),measurement:null};
+      blueItems.push(item);
+      if (item.label) {
+        item.label.value = 'Tube ' + index;
+        item.label.addEventListener('input',markObservation);
+      }
+      section.querySelector('button').onclick = () => document.getElementById('fileInput'+index).click();
+      preview.addEventListener('load', () => {
+        if (!selectedPhotos[index]) return;
+        const scale = Math.min(1,1400/Math.max(preview.naturalWidth,preview.naturalHeight));
+        canvas.width = Math.max(1,Math.round(preview.naturalWidth*scale));
+        canvas.height = Math.max(1,Math.round(preview.naturalHeight*scale));
+        section.hidden = false; canvas.hidden = false; drawBlue(item,item.rect);
+        document.getElementById('blueAdd').hidden = blueItems.every(i=>!i.section.hidden);
+      });
+      function point(event) {
+        const bounds=canvas.getBoundingClientRect();
+        return [Math.max(0,Math.min(canvas.width,Math.round((event.clientX-bounds.left)*canvas.width/bounds.width))),
+          Math.max(0,Math.min(canvas.height,Math.round((event.clientY-bounds.top)*canvas.height/bounds.height)))];
+      }
+      function rectangle(event) {
+        const [x,y]=point(event), [sx,sy]=item.start;
+        return [Math.min(x,sx),Math.min(y,sy),Math.abs(x-sx),Math.abs(y-sy)];
+      }
+      canvas.onpointerdown = event => {
+        if (!event.isPrimary) return;
+        canvas.setPointerCapture(event.pointerId); item.start=point(event);
+      };
+      canvas.onpointermove = event => { if(item.start && event.isPrimary) drawBlue(item,rectangle(event)); };
+      canvas.onpointercancel = () => { item.start=null; drawBlue(item,item.rect); };
+      canvas.onpointerup = event => {
+        if (!item.start || !event.isPrimary) return;
+        const rect=rectangle(event); item.start=null;
+        const [x,y,w,h]=rect;
+        if (w<2 || h<2) {drawBlue(item,item.rect); return;}
+        drawBlue(item,null);
+        const pixels=canvas.getContext('2d').getImageData(x,y,w,h).data;
+        const sums=[0,0,0];
+        for(let p=0;p<pixels.length;p+=4) for(let c=0;c<3;c++) sums[c]+=pixels[p+c];
+        const rgb=sums.map(sum=>Math.round(sum/(w*h)));
+        item.measurement={rgb,hex:'#'+rgb.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase(),
+          roi:[x/canvas.width,y/canvas.height,w/canvas.width,h/canvas.height].map(v=>v.toFixed(5))};
+        item.rect=rect; drawBlue(item,rect); refreshBlue(); markObservation();
+      };
+    }
+    document.getElementById('blueAdd').onclick = event => {
+      const next=blueItems.find(item=>item.section.hidden);
+      if(next) next.section.hidden=false;
+      event.currentTarget.hidden=blueItems.every(item=>!item.section.hidden);
+    };
+
     // Visitors can capture data and generate a PDF without signing in.
     // saveEntry() still requires login before writing to Supabase.
     loadFolderOptions().catch(error => { document.getElementById("folderStatus").textContent = "Could not load folders: " + error.message; });
