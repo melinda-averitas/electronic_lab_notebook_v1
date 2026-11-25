@@ -232,6 +232,8 @@
     .qc-panel input[type=checkbox]{width:auto}
     .qc-canvas {width:100%;height:auto;display:block;touch-action:none;cursor:crosshair;border-radius:8px;border:1px solid #b6d9d3;background:#e9eeed}
     .qc-stage {position:relative;margin-top:10px}
+    .qc-crop-panel {background:#fff;border:1px solid #b6d9d3;border-radius:10px;padding:12px;margin-top:12px}
+    .qc-crop-preview {display:block;max-width:100%;width:auto;height:auto;max-height:240px;border:1px solid var(--border);border-radius:7px;background:#f3f4f6}
     .qc-metrics {white-space:pre-wrap;font:0.85rem/1.6 ui-monospace,monospace;background:white;border:1px solid var(--border);padding:10px;border-radius:8px;overflow-wrap:anywhere}
     @media(max-width:520px){.qc-controls{grid-template-columns:1fr}}
     .account-save-button,
@@ -311,6 +313,16 @@
             <button class="secondary" type="button" onclick="setClarityRoiMode('background')">Select background ROI (optional)</button>
           </div>
           <p class="status" id="qcRoiStatus" role="status">Load a photo, then drag over the supernatant to select a rectangular ROI.</p>
+          <div id="qcCropPanel" class="qc-crop-panel" hidden>
+            <strong>Cropped liquid ROI preview</strong>
+            <p class="status">This derivative shows exactly what will be analyzed. Your original photo is never changed. Optionally add the crop to one of the five existing photo slots.</p>
+            <canvas id="qcCropCanvas" class="qc-crop-preview" aria-label="Selected supernatant crop preview"></canvas>
+            <div class="qc-controls" style="margin-top:10px">
+              <div><label for="qcCropTarget">Save crop to an empty photo slot</label><select id="qcCropTarget"></select></div>
+              <div style="align-self:end"><button class="secondary" type="button" onclick="saveClarityCropToSlot()">Save Crop to Photo Slot</button></div>
+            </div>
+            <p class="status" id="qcCropStatus" role="status" aria-live="polite">Crop preview ready; saving it is optional.</p>
+          </div>
           <p class="status">Optional background ROI: choose an adjacent area under comparable lighting, excluding shadows and tube edges. It helps document illumination differences; it does <strong>not</strong> directly yield NTU or calibrated haze.</p>
           <p style="margin:10px 0 4px"><strong>Color references</strong> (descriptive comparisons only)</p>
           <div class="qc-controls" style="margin-bottom:10px">
@@ -319,6 +331,7 @@
           </div>
           <p class="status">Color distance percentages are normalized RGB differences, not percentages of cloudiness. Texture metrics are exploratory visual proxies, not particle counts. The Nov 23 HEX is an approximate mean from a selected liquid region of the photo associated with ~13% lower blank-corrected OD595, not a calibrated clear-water standard. Lighting and background affect both comparisons.</p>
           <button type="button" onclick="analyzeClarity()">Analyze Clarity</button>
+          <p id="qcAnalyzeStatus" class="status" role="status" aria-live="polite">Select an ROI in the photograph above, then press Analyze Clarity.</p>
           <div id="qcOutput" hidden>
             <h3>Image metrics</h3>
             <div id="qcMetrics" class="qc-metrics"></div>
@@ -460,7 +473,8 @@
     let clarityBackgroundSelection = null;
     let clarityRoiMode = 'sample';
     let clarityDrag = null;
-    const CLARITY_VERSION = 'clarity-0.3';
+    const CLARITY_VERSION = 'clarity-0.4';
+    let clarityCropInfo = null; // Metadata for an optional derivative stored in an existing photo slot.
     // Empirical reference: central liquid ROI, IMG_6767(1).jpeg (Nov 23, 2026).
     // Source ROI x=560..625, y=720..840 px in 1152x1536 photo; approximate RGB.
     const CLARITY_REFERENCES = {white:{rgb:[255,255,255],hex:'#FFFFFF',label:'Theoretical white'}, empirical:{rgb:[159,156,140],hex:'#9F9C8C',label:'Nov 23 acceptable-preparation photo (provisional)'}};
@@ -525,6 +539,9 @@
     }
     // QC v0.1: all computations happen in the browser; no new table or bucket.
     function invalidateClaritySlot(slot) {
+      if (clarityCropInfo && (clarityCropInfo.source_slot === slot || clarityCropInfo.crop_slot === slot)) clarityCropInfo = null;
+      // Preserve measurements from original photos, but mark their optional crop as missing if removed.
+      for (const rec of clarityAnalyses) if (rec.crop_photo_slot === slot + 1) rec.crop_photo_slot = null;
       const count = clarityAnalyses.filter(record => record.photo_slot === slot + 1).length;
       if (count) {
         clarityAnalyses = clarityAnalyses.filter(record => record.photo_slot !== slot + 1);
@@ -534,6 +551,7 @@
         clarityWorking = null;
         claritySelection = null;
         clarityBackgroundSelection = null;
+        hideClarityCrop();
         document.getElementById('qcStage').hidden = true;
         document.getElementById('qcOutput').hidden = true;
       }
@@ -544,7 +562,7 @@
         '=== SUPERNATANT CLARITY QC ===',
         `Algorithm: ${r.algorithm_version} | Thresholds: ${r.threshold_version}`,
         `Tube / preparation ID: ${r.tube_id}`,
-        `Photo slot: ${r.photo_slot} | Analysis time: ${r.analyzed_at}`,
+        `Original photo slot: ${r.photo_slot} | ROI crop photo slot: ${r.crop_photo_slot || 'Not saved'} | Analysis time: ${r.analyzed_at}`,
         `ROI normalized (x,y,w,h): ${[r.roi.x,r.roi.y,r.roi.width,r.roi.height].map(v=>v.toFixed(5)).join(', ')}`,
         `Mean RGB: ${m.rgb.join(', ')} | HEX: ${m.hex}`,
         `Reference A theoretical white: #FFFFFF | RGB color distance: ${m.distance_to_white_rgb} / 441.67 (${m.white_color_distance_pct}%)`,
@@ -564,12 +582,82 @@
         '=== END CLARITY QC ==='
       ].join('\n');
     }
+    function hideClarityCrop() {
+      document.getElementById('qcCropPanel').hidden = true;
+    }
+    function refreshClarityCropTargets() {
+      const dropdown = document.getElementById('qcCropTarget');
+      const previous = dropdown.value;
+      dropdown.replaceChildren();
+      for (let i=0; i<selectedPhotos.length; i++) {
+        if (selectedPhotos[i] || (clarityWorking && i===clarityWorking.slot)) continue;
+        const option = document.createElement('option');
+        option.value=String(i); option.textContent=`Photo ${i+1} (empty)`;
+        dropdown.appendChild(option);
+      }
+      if ([...dropdown.options].some(option=>option.value===previous)) dropdown.value=previous;
+      const available=dropdown.options.length>0;
+      document.getElementById('qcCropStatus').textContent = available
+        ? 'Select an empty photo slot. The ROI crop is optional; original image remains in its current slot.'
+        : 'All five photo slots are occupied. You can analyze without saving a crop, or free an unused slot.';
+    }
+    function showClarityCrop() {
+      if (!clarityWorking || !claritySelection || claritySelection.width<.01 || claritySelection.height<.01) {hideClarityCrop();return;}
+      const {image}=clarityWorking, r=claritySelection;
+      const sx=Math.floor(r.x*image.width),sy=Math.floor(r.y*image.height);
+      const sw=Math.min(image.width-sx,Math.max(1,Math.ceil(r.width*image.width)));
+      const sh=Math.min(image.height-sy,Math.max(1,Math.ceil(r.height*image.height)));
+      const scale=Math.min(1,512/Math.max(sw,sh));
+      const out=document.getElementById('qcCropCanvas');
+      out.width=Math.max(1,Math.round(sw*scale)); out.height=Math.max(1,Math.round(sh*scale));
+      out.getContext('2d').drawImage(image,sx,sy,sw,sh,0,0,out.width,out.height);
+      document.getElementById('qcCropPanel').hidden=false;
+      refreshClarityCropTargets();
+    }
+    async function saveClarityCropToSlot() {
+      const status=document.getElementById('qcCropStatus');
+      if(!clarityWorking||!claritySelection||claritySelection.width<.01||claritySelection.height<.01){status.textContent='Select a liquid ROI first.';return;}
+      if(selectedPhotos[clarityWorking.slot]!==clarityWorking.blob){status.textContent='Original photo changed. Load and select the ROI again.';return;}
+      const target=Number(document.getElementById('qcCropTarget').value);
+      if(!Number.isInteger(target)||target<0||target>=selectedPhotos.length||target===clarityWorking.slot||selectedPhotos[target]){
+        status.textContent='Choose an empty photo slot; existing photos cannot be overwritten.';refreshClarityCropTargets();return;
+      }
+      const canvas=document.getElementById('qcCropCanvas');
+      if(!canvas.width||!canvas.height){status.textContent='Crop preview unavailable. Select ROI again.';return;}
+      status.textContent='Preparing small crop…';
+      try {
+        // Use the working image's unmarked pixels; the green ROI outline never enters the crop.
+        // The crop is a derivative WebP and goes through the ordinary save/Storage upload path.
+        let blob=null;
+        for (const q of [.78,.64,.50,.36]) {
+          blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',q));
+          if(blob && blob.size<=250000) break;
+        }
+        if(!blob) throw new Error('Browser could not encode crop.');
+        if(selectedPhotos[target]) throw new Error('Selected slot was filled while generating crop. Choose a different slot.');
+        const filename=`clarity_roi_tube_${(document.getElementById('qcTube').value.trim()||'sample').replace(/[^a-z0-9_-]/gi,'_').slice(0,45)}_${Date.now()}.webp`;
+        const file=new File([blob],filename,{type:'image/webp'});
+        const sourceSlot=clarityWorking.slot;
+        selectedPhotos[target]=file;
+        clarityCropInfo={source_slot:sourceSlot,crop_slot:target,source_blob:clarityWorking.blob,roi:{...claritySelection}};
+        showPhotoPreview(file,target);
+        document.getElementById(`photoStatus${target}`).textContent=`✓ QC ROI crop (${Math.round(blob.size/1024)} KB), derived from Photo ${sourceSlot+1}.`;
+        // Link an already-attached analysis of precisely this ROI, if present.
+        for(const record of clarityAnalyses){
+          const r=record.roi;
+          if(record.photo_slot===sourceSlot+1 && Object.keys(r).every(k=>r[k]===claritySelection[k])) record.crop_photo_slot=target+1;
+        }
+        markObservation();
+        status.textContent=`Saved crop to Photo ${target+1} (${Math.round(blob.size/1024)} KB). It will save with the Observation Card using the existing Save Data button.`;
+        refreshClarityCropTargets();
+      } catch(error) {status.textContent='Could not save crop: '+error.message;}
+    }
     function drawClarityCanvas() {
       if (!clarityWorking) return;
       const canvas = document.getElementById('qcCanvas');
       const ctx = canvas.getContext('2d');
       const img = clarityWorking.image;
-      canvas.width = img.width; canvas.height = img.height;
+      if (canvas.width !== img.width || canvas.height !== img.height) { canvas.width = img.width; canvas.height = img.height; }
       ctx.drawImage(img, 0, 0);
       if (clarityBackgroundSelection) {
         const b = clarityBackgroundSelection;
@@ -597,11 +685,12 @@
         working.getContext('2d',{willReadFrequently:true}).drawImage(bmp,0,0,working.width,working.height);
         bmp.close?.();
         clarityWorking = {image:working, slot, blob:file};
-        claritySelection=null;clarityBackgroundSelection=null;clarityRoiMode='sample';latestClarityMetrics=null;
+        claritySelection=null;clarityBackgroundSelection=null;clarityRoiMode='sample';latestClarityMetrics=null;hideClarityCrop();
         document.getElementById('qcOutput').hidden=true;
         document.getElementById('qcStage').hidden=false;
         drawClarityCanvas();
         document.getElementById('qcRoiStatus').textContent='Drag across the photo to select supernatant ROI.';
+        clarityAnalyzeMessage('Photo loaded. Draw a rectangle inside the liquid on the photograph above, then Analyze Clarity.');
       } catch(err) {document.getElementById('qcRoiStatus').textContent='Could not decode photo: '+err.message;}
     }
     function clarityPoint(event) {
@@ -609,20 +698,29 @@
       return {x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};
     }
     const qcCanvas=document.getElementById('qcCanvas');
+    function clarityAnalyzeMessage(msg){ document.getElementById('qcAnalyzeStatus').textContent=msg; }
     qcCanvas.addEventListener('pointerdown',event=>{
       if(!clarityWorking)return;
-      clarityDrag=clarityPoint(event);if(clarityRoiMode==='sample')claritySelection=null;else clarityBackgroundSelection=null;latestClarityMetrics=null;document.getElementById('qcOutput').hidden=true;
-      qcCanvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      clarityDrag=clarityPoint(event);if(clarityRoiMode==='sample'){claritySelection=null;hideClarityCrop();}else clarityBackgroundSelection=null;latestClarityMetrics=null;document.getElementById('qcOutput').hidden=true;
+      try { qcCanvas.setPointerCapture(event.pointerId); } catch (_) {}
     });
     qcCanvas.addEventListener('pointermove',event=>{
       if(!clarityDrag)return;
+      event.preventDefault();
       const p=clarityPoint(event);
       const roi={x:Math.min(clarityDrag.x,p.x),y:Math.min(clarityDrag.y,p.y),width:Math.abs(p.x-clarityDrag.x),height:Math.abs(p.y-clarityDrag.y)};
       if(clarityRoiMode==='sample') claritySelection=roi; else clarityBackgroundSelection=roi;
       drawClarityCanvas();
     });
-    function finishClarityROI(){
+    function finishClarityROI(event){
       if(!clarityDrag)return;
+      // Capture the final finger position even if iOS emitted no last pointermove.
+      if(event && typeof event.clientX==='number'){
+        const p=clarityPoint(event);
+        const roi={x:Math.min(clarityDrag.x,p.x),y:Math.min(clarityDrag.y,p.y),width:Math.abs(p.x-clarityDrag.x),height:Math.abs(p.y-clarityDrag.y)};
+        if(clarityRoiMode==='sample')claritySelection=roi;else clarityBackgroundSelection=roi;
+      }
       clarityDrag=null;
       const roi = clarityRoiMode==='sample' ? claritySelection : clarityBackgroundSelection;
       if (roi && roi.width>=.01 && roi.height>=.01) document.getElementById('qcRoiStatus').textContent = clarityRoiMode==='sample'
@@ -630,13 +728,17 @@
         : 'Background ROI selected. Select liquid ROI if needed, or press Analyze Clarity.';
       else {if(clarityRoiMode==='sample')claritySelection=null;else clarityBackgroundSelection=null;document.getElementById('qcRoiStatus').textContent='ROI too small. Drag a larger rectangle.';}
       drawClarityCanvas();
+      if(clarityRoiMode==='sample') showClarityCrop();
     }
     qcCanvas.addEventListener('pointerup',finishClarityROI);
     qcCanvas.addEventListener('pointercancel',finishClarityROI);
     let latestClarityMetrics=null;
     function analyzeClarity() {
-      if(!clarityWorking || !claritySelection){document.getElementById('qcRoiStatus').textContent='Load a photo and draw an ROI first.';return;}
-      if(selectedPhotos[clarityWorking.slot]!==clarityWorking.blob){document.getElementById('qcRoiStatus').textContent='This photo changed. Load it again.';return;}
+      if(!clarityWorking || !claritySelection){
+        const msg=!clarityWorking ? 'No photo loaded for QC. Choose Photo 1–5, then tap Load selected photo & choose ROI.' : 'No liquid ROI selected. Scroll up to the photo and drag a rectangle INSIDE the liquid; then press Analyze Clarity again.';
+        document.getElementById('qcRoiStatus').textContent=msg;clarityAnalyzeMessage(msg);return;
+      }
+      if(selectedPhotos[clarityWorking.slot]!==clarityWorking.blob){const msg='This photo changed. Load it again.';document.getElementById('qcRoiStatus').textContent=msg;clarityAnalyzeMessage(msg);return;}
       const {image}=clarityWorking,r=claritySelection;
       const x=Math.floor(r.x*image.width),y=Math.floor(r.y*image.height);
       const w=Math.min(image.width-x,Math.max(1,Math.ceil(r.width*image.width)));
@@ -710,6 +812,7 @@
       ].join('\n');
       document.getElementById('qcAssessment').textContent='Review';
       document.getElementById('qcOutput').hidden=false;
+      clarityAnalyzeMessage(`Analysis complete: ${hex}; ${latestClarityMetrics.white_color_distance_pct}% color distance from white. Full results appear below.`);
     }
     function attachClarityAnalysis(){
       if(!latestClarityMetrics||!claritySelection||!clarityWorking){document.getElementById('qcRoiStatus').textContent='Analyze an ROI first.';return;}
@@ -721,7 +824,7 @@
       const reason=document.getElementById('qcOverrideReason').value.trim();
       if(override&&!reason){document.getElementById('qcRoiStatus').textContent='Enter an override reason before attaching.';return;}
       const number=clarityAnalyses.filter(r=>r.tube_id===tube).length+1;
-      clarityAnalyses.push({tube_id:tube,photo_slot:slot+1,roi:{...claritySelection},background_roi:clarityBackgroundSelection?{...clarityBackgroundSelection}:null,metrics:{...latestClarityMetrics},algorithm_version:CLARITY_VERSION,threshold_version:'none (exploratory)',auto_qc:'review',operator_qc:override?document.getElementById('qcOverrideStatus').value:'review',override_reason:override?reason:null,comment:document.getElementById('qcComment').value.trim(),analyzed_at:new Date().toISOString(),reassessment_number:number});
+      clarityAnalyses.push({tube_id:tube,photo_slot:slot+1,crop_photo_slot:clarityCropInfo && clarityCropInfo.source_slot===slot && clarityCropInfo.source_blob===clarityWorking.blob && Object.keys(claritySelection).every(k=>claritySelection[k]===clarityCropInfo.roi[k]) && selectedPhotos[clarityCropInfo.crop_slot] ? clarityCropInfo.crop_slot+1 : null,roi:{...claritySelection},background_roi:clarityBackgroundSelection?{...clarityBackgroundSelection}:null,metrics:{...latestClarityMetrics},algorithm_version:CLARITY_VERSION,threshold_version:'none (exploratory)',auto_qc:'review',operator_qc:override?document.getElementById('qcOverrideStatus').value:'review',override_reason:override?reason:null,comment:document.getElementById('qcComment').value.trim(),analyzed_at:new Date().toISOString(),reassessment_number:number});
       markObservation();
       document.getElementById('qcAttachedStatus').textContent=`${clarityAnalyses.length} QC analysis record(s) attached. They will be included in the Observation Card and existing saved notes.`;
       document.getElementById('qcRoiStatus').textContent='QC attached. Select another photo or ROI to reassess, or Create Observation Card.';
@@ -1113,6 +1216,9 @@
       clarityAnalyses = [];
       clarityWorking = null;
       claritySelection = null;
+      clarityBackgroundSelection = null;
+      clarityCropInfo = null;
+      hideClarityCrop();
       document.getElementById('qcOutput').hidden = true;
       document.getElementById('qcStage').hidden = true;
       document.getElementById('qcAttachedStatus').textContent = 'No QC analyses attached yet.';
