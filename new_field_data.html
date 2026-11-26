@@ -301,7 +301,7 @@
 
     <section><details id="blueModule"><summary>Module 2 · Post-Bradford blue QC</summary>
 <p>Photograph the control and each sample before plating. Drag inside the liquid to measure its color. Each sample is compared with the control in Photo 1.</p>
-<div id="blueSlots"></div><button type="button" id="blueAdd">Add another tube</button>
+<div id="blueSlots"></div><button type="button" id="blueAdd">Add another tube</button><button type="button" id="blueAttach">Attach Module 2 to Observation Card</button><p id="blueAttachmentStatus" aria-live="polite"></p>
 </details></section>
     <section aria-labelledby="qcHeading">
       <details id="clarityDetails">
@@ -844,7 +844,19 @@
       const qcText = clarityAnalyses.length ? '\n\n' + clarityAnalyses.map(formatClarityRecord).join('\n\n') : '';
       const notes = enteredNotes + qcText + blueNotes();
       let title = document.getElementById('noteTitle').value; 
-      const photos = selectedPhotos.map((blob,slot)=>blob?{blob,slot}:null).filter(Boolean);
+      const photos = [];
+      for (const [slot, blob] of selectedPhotos.entries()) {
+        if (!blob) continue;
+        const item = blueItems[slot];
+        const caption = 'Photo ' + (slot + 1);
+        const activelyUsed = item.measurement || item.bluePhoto;
+        const title = activelyUsed ? caption + ' - ' + blueLabel(item) : caption;
+        photos.push({blob, slot, caption: title});
+        if (item.measurement) {
+          photos.push({blob: item.measurement.crop, slot, isBlueCrop: true,
+            caption: title + ' - analyzed liquid ROI'});
+        }
+      }
       if (photos.length || notes || title.trim() || latitude !== null) {
         if (forSave && !title.trim()) {
           title = defaultNoteTitle();
@@ -1028,6 +1040,8 @@
       markObservation();
       invalidateClaritySlot(slotIndex);
       selectedPhotos[slotIndex] = file;
+      blueItems[slotIndex].bluePhoto = event.target.dataset.blueSource === '1';
+      delete event.target.dataset.blueSource;
       showPhotoPreview(file,slotIndex);
     }
 
@@ -1115,12 +1129,12 @@
       const date = Number.isNaN(captured.getTime()) ? stamp.slice(0, 10) : `${captured.getFullYear()}-${String(captured.getMonth()+1).padStart(2,"0")}-${String(captured.getDate()).padStart(2,"0")}`;
       const folder = (observation?.folderName || "Unfiled").normalize("NFKD").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "unfiled";
       const title = (observation?.title || "field-observation").normalize("NFKD").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 60) || "field-observation";
-      const file = await compressImage(
+      const file = photo.isBlueCrop ? photo.blob : await compressImage(
         photo.blob,
         `Averitas_ELN_${title}_${stamp}`
       );
       const unique = globalThis.crypto?.randomUUID ? crypto.randomUUID().slice(0, 8) : String(Date.now());
-      const path = `${currentUser.id}/${folder}/${date}/${title}_photo-${slotNumber}_${stamp}_${unique}.webp`;
+      const path = `${currentUser.id}/${folder}/${date}/${title}_photo-${slotNumber}${photo.isBlueCrop ? '-blue-roi' : ''}_${stamp}_${unique}.${photo.isBlueCrop ? 'png' : 'webp'}`;
 
       const { error } =
         await supabaseClient.storage
@@ -1266,7 +1280,7 @@
         let image;
         try { image = await loadReportImage(url); }
         finally { URL.revokeObjectURL(url); }
-        photos.push({image,slot:item.slot});
+        photos.push({image,slot:item.slot,caption:item.caption});
       }
       const pages = [];
       let canvas, ctx, y;
@@ -1324,7 +1338,7 @@
           const scale = Math.min((width - 2 * margin) / photo.naturalWidth, 620 / photo.naturalHeight);
           const w = photo.naturalWidth * scale, h = photo.naturalHeight * scale;
           if (y + 36 + h + 30 > bottom) newPage();
-          line('Photo ' + (item.slot + 1), true);
+          line(item.caption || 'Photo ' + (item.slot + 1), true);
           ctx.drawImage(photo, margin, y, w, h); y += h + 45;
         }
       } else { line('No photos added'); y += 18; }
@@ -1469,7 +1483,7 @@
         let image;
         try { image = await loadReportImage(url); }
         finally { URL.revokeObjectURL(url); }
-        photos.push({image,slot:item.slot});
+        photos.push({image,slot:item.slot,caption:item.caption});
       }
       const width = 1080, margin = 64, contentWidth = width - margin * 2;
       const measure = document.createElement('canvas').getContext('2d');
@@ -1515,7 +1529,7 @@
       if (layoutPhotos.length) {
         ctx.font='bold 24px Arial';
         for(const item of layoutPhotos){
-          ctx.fillStyle='#115e59';ctx.fillText('Photo '+(item.slot+1),margin,y);y+=34;
+          ctx.fillStyle='#115e59';ctx.fillText(item.caption || 'Photo '+(item.slot+1),margin,y,contentWidth);y+=34;
           ctx.drawImage(item.image,(width-item.width)/2,y,item.width,item.height);y+=item.height+36;
         }
       } else { ctx.fillText('No photos added', margin, y); y += 54; }
@@ -1622,7 +1636,7 @@
       } finally { cardSaveBusy = false; button.disabled = false; }
     }
 
-    async function prepareObservationImage() {
+    async function prepareObservationImage(downloadAutomatically = true) {
       const status = document.getElementById('imageStatus'), button = document.getElementById('imageButton');
       const observation = observationSnapshot();
       if (!observation) { status.textContent = 'Add a photo, GPS location or notes first.'; return; }
@@ -1638,7 +1652,7 @@
         if (supportsPDFSharing(preparedImage)) {
           document.getElementById('shareImageButton').hidden = false;
           status.textContent = 'Card ready. Tap Share Observation to choose an app, or download the image.';
-        } else { downloadObservationImage(); }
+        } else if (downloadAutomatically) { downloadObservationImage(); } else { status.textContent = "Observation card ready."; }
       } catch (e) { status.textContent = 'Could not create the card: ' + e.message; }
       finally { button.disabled = false; }
     }
@@ -1680,6 +1694,10 @@
       return details + (ref ? ' · Distance from control: ' + clarityColorPercent(m.rgb, ref.rgb).toFixed(2) + '%' : ' · Select the control ROI to compare.');
     }
     function refreshBlue() {
+      const measured = blueItems.filter(item => item.measurement).length;
+      document.getElementById('blueAttachmentStatus').textContent = measured
+        ? measured + ' measured photo(s). Each source photo, liquid ROI crop and result is attached to this draft for Create Observation Card and Save to My Data.'
+        : '';
       for (const item of blueItems) item.output.textContent = blueReport(item);
     }
     function blueNotes() {
@@ -1701,7 +1719,7 @@
     }
     function clearBlueMeasurement(index) {
       const item = blueItems[index];
-      item.measurement = null; item.start = null; item.rect = null; item.canvas.hidden = true;
+      item.measurement = null; item.bluePhoto = false; item.start = null; item.rect = null; item.canvas.hidden = true;
       refreshBlue();
     }
     function resetBlue() {
@@ -1726,7 +1744,11 @@
         item.label.value = 'Tube ' + index;
         item.label.addEventListener('input',markObservation);
       }
-      section.querySelector('button').onclick = () => document.getElementById('fileInput'+index).click();
+      section.querySelector('button').onclick = () => {
+        const input = document.getElementById('fileInput'+index);
+        input.dataset.blueSource = '1';
+        input.click();
+      };
       preview.addEventListener('load', () => {
         if (!selectedPhotos[index]) return;
         const scale = Math.min(1,1400/Math.max(preview.naturalWidth,preview.naturalHeight));
@@ -1760,11 +1782,36 @@
         const sums=[0,0,0];
         for(let p=0;p<pixels.length;p+=4) for(let c=0;c<3;c++) sums[c]+=pixels[p+c];
         const rgb=sums.map(sum=>Math.round(sum/(w*h)));
-        item.measurement={rgb,hex:'#'+rgb.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase(),
+        // Copy the measured pixels before drawing the selection outline.
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = w; cropCanvas.height = h;
+        cropCanvas.getContext('2d').drawImage(canvas,x,y,w,h,0,0,w,h);
+        const bytes = atob(cropCanvas.toDataURL('image/png').split(',')[1]);
+        const crop = new Blob([Uint8Array.from(bytes, char => char.charCodeAt(0))], {type:'image/png'});
+        item.measurement={crop,rgb,hex:'#'+rgb.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase(),
           roi:[x/canvas.width,y/canvas.height,w/canvas.width,h/canvas.height].map(v=>v.toFixed(5))};
         item.rect=rect; drawBlue(item,rect); refreshBlue(); markObservation();
       };
     }
+    document.getElementById('blueAttach').onclick = async event => {
+      const status = document.getElementById('blueAttachmentStatus');
+      if (!blueItems[0].measurement || !blueItems.slice(1).some(i=>i.measurement)) {
+        status.textContent = 'Select a liquid ROI for the reference and at least one sample first.';
+        return;
+      }
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        await prepareObservationImage(false);
+        if (!preparedImage) {
+          status.textContent = document.getElementById('imageStatus').textContent;
+          return;
+        }
+        const count = blueItems.filter(i=>i.measurement).length;
+        status.textContent = 'Card ready with ' + count + ' measured photos, their ROI crops and color results. Use Save to My Data to store this observation.';
+        document.getElementById('cardPreview').scrollIntoView({block:'start'});
+      } finally { button.disabled = false; }
+    };
     document.getElementById('blueAdd').onclick = event => {
       const next=blueItems.find(item=>item.section.hidden);
       if(next) next.section.hidden=false;
